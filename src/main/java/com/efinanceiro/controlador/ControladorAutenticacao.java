@@ -1,7 +1,9 @@
 package com.efinanceiro.controlador;
 
 import com.efinanceiro.dto.requisicao.RequisicaoCadastro;
+import com.efinanceiro.dto.requisicao.RequisicaoEsqueciSenha;
 import com.efinanceiro.dto.requisicao.RequisicaoLogin;
+import com.efinanceiro.dto.requisicao.RequisicaoRedefinirSenha;
 import com.efinanceiro.dto.resposta.RespostaAutenticacao;
 import com.efinanceiro.servico.ServicoAutenticacao;
 import jakarta.validation.Valid;
@@ -44,5 +46,28 @@ public class ControladorAutenticacao {
     public ResponseEntity<RespostaAutenticacao> login(@Valid @RequestBody RequisicaoLogin requisicao) {
         RespostaAutenticacao resposta = servicoAutenticacao.login(requisicao);
         return ResponseEntity.ok(resposta);
+    }
+
+    /**
+     * Solicita a redefinição de senha: se o e-mail informado estiver cadastrado, envia um link
+     * de redefinição por e-mail. Sempre responde 200, mesmo se o e-mail não existir.
+     *
+     * @param requisicao E-mail do usuário que esqueceu a senha
+     */
+    @PostMapping("/esqueci-senha")
+    public ResponseEntity<Void> esqueciSenha(@Valid @RequestBody RequisicaoEsqueciSenha requisicao) {
+        servicoAutenticacao.esqueciSenha(requisicao);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Redefine a senha do usuário a partir do token recebido por e-mail.
+     *
+     * @param requisicao Token de redefinição e a nova senha
+     */
+    @PostMapping("/redefinir-senha")
+    public ResponseEntity<Void> redefinirSenha(@Valid @RequestBody RequisicaoRedefinirSenha requisicao) {
+        servicoAutenticacao.redefinirSenha(requisicao);
+        return ResponseEntity.ok().build();
     }
 }

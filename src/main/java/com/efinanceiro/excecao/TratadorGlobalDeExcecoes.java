@@ -64,6 +64,17 @@ public class TratadorGlobalDeExcecoes {
     }
 
     /**
+     * Trata tentativa de redefinição de senha com token inexistente, já usado ou expirado.
+     *
+     * @param excecao Exceção de token inválido ou expirado
+     * @return Corpo de erro com status 400
+     */
+    @ExceptionHandler(TokenInvalidoOuExpiradoException.class)
+    public ResponseEntity<Map<String, Object>> tratarTokenInvalidoOuExpirado(TokenInvalidoOuExpiradoException excecao) {
+        return ResponseEntity.badRequest().body(corpoDeErro(excecao.getMessage()));
+    }
+
+    /**
      * Trata qualquer erro não mapeado explicitamente, sem vazar detalhes internos ao cliente.
      *
      * @param excecao Exceção não tratada

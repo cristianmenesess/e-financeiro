@@ -22,4 +22,12 @@ public interface RepositorioUsuario extends JpaRepository<Usuario, Long> {
      * @return true se já existir um usuário com esse e-mail
      */
     boolean existsByEmail(String email);
+
+    /**
+     * Busca um usuário pelo hash do token de redefinição de senha.
+     *
+     * @param tokenRedefinicaoHash Hash SHA-256 do token de redefinição
+     * @return Usuário encontrado, se o hash corresponder a um token ativo
+     */
+    Optional<Usuario> findByTokenRedefinicaoHash(String tokenRedefinicaoHash);
 }

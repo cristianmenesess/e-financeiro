@@ -36,6 +36,12 @@ public class Usuario {
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;
 
+    @Column(name = "token_redefinicao_hash", length = 64)
+    private String tokenRedefinicaoHash;
+
+    @Column(name = "token_redefinicao_expira_em")
+    private Instant tokenRedefinicaoExpiraEm;
+
     @PrePersist
     private void aoPersistir() {
         this.criadoEm = Instant.now();

@@ -2,14 +2,26 @@ package com.efinanceiro.servico;
 
 import com.efinanceiro.dominio.Usuario;
 import com.efinanceiro.dto.requisicao.RequisicaoCadastro;
+import com.efinanceiro.dto.requisicao.RequisicaoEsqueciSenha;
 import com.efinanceiro.dto.requisicao.RequisicaoLogin;
+import com.efinanceiro.dto.requisicao.RequisicaoRedefinirSenha;
 import com.efinanceiro.dto.resposta.RespostaAutenticacao;
 import com.efinanceiro.excecao.CredenciaisInvalidasException;
 import com.efinanceiro.excecao.EmailJaCadastradoException;
+import com.efinanceiro.excecao.TokenInvalidoOuExpiradoException;
 import com.efinanceiro.repositorio.RepositorioUsuario;
 import com.efinanceiro.seguranca.ServicoJwt;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
+import java.util.UUID;
 
 @Service
 public class ServicoAutenticacao {
@@ -17,13 +29,19 @@ public class ServicoAutenticacao {
     private final RepositorioUsuario repositorioUsuario;
     private final PasswordEncoder codificadorDeSenha;
     private final ServicoJwt servicoJwt;
+    private final ServicoEmail servicoEmail;
+    private final String frontendUrl;
 
     public ServicoAutenticacao(RepositorioUsuario repositorioUsuario,
                                 PasswordEncoder codificadorDeSenha,
-                                ServicoJwt servicoJwt) {
+                                ServicoJwt servicoJwt,
+                                ServicoEmail servicoEmail,
+                                @Value("${app.frontend.url}") String frontendUrl) {
         this.repositorioUsuario = repositorioUsuario;
         this.codificadorDeSenha = codificadorDeSenha;
         this.servicoJwt = servicoJwt;
+        this.servicoEmail = servicoEmail;
+        this.frontendUrl = frontendUrl;
     }
 
     /**
@@ -64,5 +82,55 @@ public class ServicoAutenticacao {
 
         String token = servicoJwt.gerarToken(usuario.getEmail());
         return new RespostaAutenticacao(token, usuario.getNome(), usuario.getEmail());
+    }
+
+    /**
+     * Solicita a redefinição de senha: se o e-mail estiver cadastrado, gera um token de reset,
+     * salva apenas o hash dele (com expiração de 1 hora) e envia o link por e-mail. Não revela
+     * se o e-mail existe ou não — sempre retorna normalmente.
+     *
+     * @param requisicao E-mail do usuário que esqueceu a senha
+     */
+    public void esqueciSenha(RequisicaoEsqueciSenha requisicao) {
+        repositorioUsuario.findByEmail(requisicao.email()).ifPresent(usuario -> {
+            String token = UUID.randomUUID().toString().replace("-", "");
+
+            usuario.setTokenRedefinicaoHash(sha256(token));
+            usuario.setTokenRedefinicaoExpiraEm(Instant.now().plus(1, ChronoUnit.HOURS));
+            repositorioUsuario.save(usuario);
+
+            String link = frontendUrl + "/redefinir-senha.html?token=" + token;
+            servicoEmail.enviarEmailRedefinicaoSenha(usuario.getEmail(), usuario.getNome(), link);
+        });
+    }
+
+    /**
+     * Redefine a senha do usuário a partir de um token de reset válido e ainda não expirado.
+     * O token é invalidado após o uso (uso único).
+     *
+     * @param requisicao Token recebido por e-mail e a nova senha
+     */
+    public void redefinirSenha(RequisicaoRedefinirSenha requisicao) {
+        String hash = sha256(requisicao.token());
+
+        Usuario usuario = repositorioUsuario.findByTokenRedefinicaoHash(hash)
+                .filter(u -> u.getTokenRedefinicaoExpiraEm() != null
+                        && u.getTokenRedefinicaoExpiraEm().isAfter(Instant.now()))
+                .orElseThrow(() -> new TokenInvalidoOuExpiradoException("Link de redefinição inválido ou expirado"));
+
+        usuario.setSenhaHash(codificadorDeSenha.encode(requisicao.novaSenha()));
+        usuario.setTokenRedefinicaoHash(null);
+        usuario.setTokenRedefinicaoExpiraEm(null);
+        repositorioUsuario.save(usuario);
+    }
+
+    private String sha256(String valor) {
+        try {
+            MessageDigest digestor = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digestor.digest(valor.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Algoritmo SHA-256 indisponível", e);
+        }
     }
 }
