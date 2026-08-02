@@ -49,7 +49,11 @@ public class TratadorGlobalDeExcecoes {
      */
     @ExceptionHandler({CredenciaisInvalidasException.class, BadCredentialsException.class})
     public ResponseEntity<Map<String, Object>> tratarCredenciaisInvalidas(RuntimeException excecao) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(corpoDeErro("E-mail ou senha inválidos"));
+        String mensagem = excecao instanceof CredenciaisInvalidasException
+                ? excecao.getMessage()
+                : "E-mail ou senha inválidos";
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(corpoDeErro(mensagem));
     }
 
     /**

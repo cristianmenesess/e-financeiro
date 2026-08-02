@@ -1,6 +1,5 @@
 package com.efinanceiro.repositorio;
 
-import com.efinanceiro.dominio.TipoConta;
 import com.efinanceiro.dominio.TipoTransacao;
 import com.efinanceiro.dominio.Transacao;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,13 +19,13 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
     List<Transacao> findByUsuarioIdOrderByDataTransacaoDesc(Long usuarioId);
 
     /**
-     * Lista as transações de um usuário filtradas por tipo de conta, ordenadas da mais recente pra mais antiga.
+     * Lista as transações de um usuário filtradas por conta, ordenadas da mais recente pra mais antiga.
      *
      * @param usuarioId Id do usuário dono das transações
-     * @param conta Tipo de conta (cpf ou pj) para filtrar
+     * @param contaId Id da conta para filtrar
      * @return Lista de transações filtradas
      */
-    List<Transacao> findByUsuarioIdAndContaOrderByDataTransacaoDesc(Long usuarioId, TipoConta conta);
+    List<Transacao> findByUsuarioIdAndContaIdOrderByDataTransacaoDesc(Long usuarioId, Long contaId);
 
     /**
      * Busca uma transação pelo id, garantindo que pertence ao usuário informado.
@@ -48,4 +47,11 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
      * @return Lista de transações do cartão no período
      */
     List<Transacao> findByCartaoIdAndTipoAndDataTransacaoBetween(Long cartaoId, TipoTransacao tipo, LocalDate inicio, LocalDate fim);
+
+    /**
+     * Apaga todas as transações vinculadas a uma conta — usado ao excluir a conta em cascata.
+     *
+     * @param contaId Id da conta cujas transações serão apagadas
+     */
+    void deleteByContaId(Long contaId);
 }

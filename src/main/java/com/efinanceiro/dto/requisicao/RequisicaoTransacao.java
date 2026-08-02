@@ -1,7 +1,6 @@
 package com.efinanceiro.dto.requisicao;
 
 import com.efinanceiro.dominio.Categoria;
-import com.efinanceiro.dominio.TipoConta;
 import com.efinanceiro.dominio.TipoTransacao;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -22,8 +21,8 @@ public record RequisicaoTransacao(
         @NotNull(message = "O tipo (entrada ou saída) é obrigatório")
         TipoTransacao tipo,
 
-        @NotNull(message = "A conta (cpf ou pj) é obrigatória")
-        TipoConta conta,
+        @NotNull(message = "A conta é obrigatória")
+        Long contaId,
 
         @NotNull(message = "A categoria é obrigatória")
         Categoria categoria,

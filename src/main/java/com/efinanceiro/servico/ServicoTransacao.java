@@ -1,7 +1,7 @@
 package com.efinanceiro.servico;
 
 import com.efinanceiro.dominio.Cartao;
-import com.efinanceiro.dominio.TipoConta;
+import com.efinanceiro.dominio.Conta;
 import com.efinanceiro.dominio.TipoTransacao;
 import com.efinanceiro.dominio.Transacao;
 import com.efinanceiro.dominio.Usuario;
@@ -10,6 +10,7 @@ import com.efinanceiro.dto.resposta.RespostaResumoSaldo;
 import com.efinanceiro.dto.resposta.RespostaTransacao;
 import com.efinanceiro.excecao.RecursoNaoEncontradoException;
 import com.efinanceiro.repositorio.RepositorioCartao;
+import com.efinanceiro.repositorio.RepositorioConta;
 import com.efinanceiro.repositorio.RepositorioTransacao;
 import com.efinanceiro.repositorio.RepositorioUsuario;
 import org.springframework.stereotype.Service;
@@ -26,26 +27,29 @@ public class ServicoTransacao {
     private final RepositorioTransacao repositorioTransacao;
     private final RepositorioUsuario repositorioUsuario;
     private final RepositorioCartao repositorioCartao;
+    private final RepositorioConta repositorioConta;
 
     public ServicoTransacao(RepositorioTransacao repositorioTransacao,
                              RepositorioUsuario repositorioUsuario,
-                             RepositorioCartao repositorioCartao) {
+                             RepositorioCartao repositorioCartao,
+                             RepositorioConta repositorioConta) {
         this.repositorioTransacao = repositorioTransacao;
         this.repositorioUsuario = repositorioUsuario;
         this.repositorioCartao = repositorioCartao;
+        this.repositorioConta = repositorioConta;
     }
 
     /**
      * Lista as transações do usuário autenticado, filtradas por conta se informado.
      *
      * @param emailUsuario E-mail do usuário autenticado
-     * @param conta Conta para filtrar (todas, cpf ou pj)
+     * @param contaId Id da conta para filtrar, ou null para todas as contas
      * @return Lista de transações ordenadas da mais recente pra mais antiga
      */
     @Transactional(readOnly = true)
-    public List<RespostaTransacao> listarTransacoes(String emailUsuario, String conta) {
+    public List<RespostaTransacao> listarTransacoes(String emailUsuario, Long contaId) {
         Usuario usuario = buscarUsuario(emailUsuario);
-        List<Transacao> transacoes = buscarTransacoesFiltradas(usuario.getId(), conta);
+        List<Transacao> transacoes = buscarTransacoesFiltradas(usuario.getId(), contaId);
 
         return transacoes.stream().map(this::paraResposta).toList();
     }
@@ -54,13 +58,13 @@ public class ServicoTransacao {
      * Calcula o resumo financeiro (saldo, entradas e saídas) do usuário autenticado, filtrado por conta se informado.
      *
      * @param emailUsuario E-mail do usuário autenticado
-     * @param conta Conta para filtrar (todas, cpf ou pj)
+     * @param contaId Id da conta para filtrar, ou null para todas as contas
      * @return Resumo com saldo, total de entradas e total de saídas
      */
     @Transactional(readOnly = true)
-    public RespostaResumoSaldo buscarResumo(String emailUsuario, String conta) {
+    public RespostaResumoSaldo buscarResumo(String emailUsuario, Long contaId) {
         Usuario usuario = buscarUsuario(emailUsuario);
-        List<Transacao> transacoes = buscarTransacoesFiltradas(usuario.getId(), conta);
+        List<Transacao> transacoes = buscarTransacoesFiltradas(usuario.getId(), contaId);
 
         BigDecimal totalEntradas = somarPorTipo(transacoes, TipoTransacao.ENTRADA);
         BigDecimal totalSaidas = somarPorTipo(transacoes, TipoTransacao.SAIDA);
@@ -121,10 +125,15 @@ public class ServicoTransacao {
         transacao.setDescricao(requisicao.descricao());
         transacao.setValor(requisicao.valor());
         transacao.setTipo(requisicao.tipo());
-        transacao.setConta(requisicao.conta());
+        transacao.setConta(resolverConta(requisicao.contaId(), usuario.getId()));
         transacao.setCategoria(requisicao.categoria());
         transacao.setDataTransacao(requisicao.dataTransacao() != null ? requisicao.dataTransacao() : LocalDate.now());
         transacao.setCartao(resolverCartao(requisicao.cartaoId(), usuario.getId()));
+    }
+
+    private Conta resolverConta(Long contaId, Long usuarioId) {
+        return repositorioConta.findByIdAndUsuarioId(contaId, usuarioId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Conta não encontrada"));
     }
 
     private Cartao resolverCartao(Long cartaoId, Long usuarioId) {
@@ -136,13 +145,12 @@ public class ServicoTransacao {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Cartão não encontrado"));
     }
 
-    private List<Transacao> buscarTransacoesFiltradas(Long usuarioId, String conta) {
-        if (conta == null || conta.equalsIgnoreCase("todas")) {
+    private List<Transacao> buscarTransacoesFiltradas(Long usuarioId, Long contaId) {
+        if (contaId == null) {
             return repositorioTransacao.findByUsuarioIdOrderByDataTransacaoDesc(usuarioId);
         }
 
-        TipoConta tipoConta = TipoConta.valueOf(conta.toUpperCase());
-        return repositorioTransacao.findByUsuarioIdAndContaOrderByDataTransacaoDesc(usuarioId, tipoConta);
+        return repositorioTransacao.findByUsuarioIdAndContaIdOrderByDataTransacaoDesc(usuarioId, contaId);
     }
 
     private BigDecimal somarPorTipo(List<Transacao> transacoes, TipoTransacao tipo) {
@@ -164,13 +172,15 @@ public class ServicoTransacao {
 
     private RespostaTransacao paraResposta(Transacao transacao) {
         Cartao cartao = transacao.getCartao();
+        Conta conta = transacao.getConta();
 
         return new RespostaTransacao(
                 transacao.getId(),
                 transacao.getDescricao(),
                 transacao.getValor(),
                 transacao.getTipo(),
-                transacao.getConta(),
+                conta.getId(),
+                conta.getNome(),
                 transacao.getCategoria(),
                 cartao != null ? cartao.getId() : null,
                 cartao != null ? cartao.getNome() : null,

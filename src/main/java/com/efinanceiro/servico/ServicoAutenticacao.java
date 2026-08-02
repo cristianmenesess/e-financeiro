@@ -1,5 +1,6 @@
 package com.efinanceiro.servico;
 
+import com.efinanceiro.dominio.Conta;
 import com.efinanceiro.dominio.Usuario;
 import com.efinanceiro.dto.requisicao.RequisicaoCadastro;
 import com.efinanceiro.dto.requisicao.RequisicaoEsqueciSenha;
@@ -9,11 +10,13 @@ import com.efinanceiro.dto.resposta.RespostaAutenticacao;
 import com.efinanceiro.excecao.CredenciaisInvalidasException;
 import com.efinanceiro.excecao.EmailJaCadastradoException;
 import com.efinanceiro.excecao.TokenInvalidoOuExpiradoException;
+import com.efinanceiro.repositorio.RepositorioConta;
 import com.efinanceiro.repositorio.RepositorioUsuario;
 import com.efinanceiro.seguranca.ServicoJwt;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -30,17 +33,20 @@ public class ServicoAutenticacao {
     private final PasswordEncoder codificadorDeSenha;
     private final ServicoJwt servicoJwt;
     private final ServicoEmail servicoEmail;
+    private final RepositorioConta repositorioConta;
     private final String frontendUrl;
 
     public ServicoAutenticacao(RepositorioUsuario repositorioUsuario,
                                 PasswordEncoder codificadorDeSenha,
                                 ServicoJwt servicoJwt,
                                 ServicoEmail servicoEmail,
+                                RepositorioConta repositorioConta,
                                 @Value("${app.frontend.url}") String frontendUrl) {
         this.repositorioUsuario = repositorioUsuario;
         this.codificadorDeSenha = codificadorDeSenha;
         this.servicoJwt = servicoJwt;
         this.servicoEmail = servicoEmail;
+        this.repositorioConta = repositorioConta;
         this.frontendUrl = frontendUrl;
     }
 
@@ -50,6 +56,7 @@ public class ServicoAutenticacao {
      * @param requisicao Dados de cadastro (nome, e-mail e senha em texto puro)
      * @return Token JWT e dados básicos do usuário recém-criado
      */
+    @Transactional
     public RespostaAutenticacao cadastrar(RequisicaoCadastro requisicao) {
         if (repositorioUsuario.existsByEmail(requisicao.email())) {
             throw new EmailJaCadastradoException("Já existe um usuário cadastrado com esse e-mail");
@@ -61,6 +68,7 @@ public class ServicoAutenticacao {
         usuario.setSenhaHash(codificadorDeSenha.encode(requisicao.senha()));
 
         repositorioUsuario.save(usuario);
+        criarContaPadrao(usuario);
 
         String token = servicoJwt.gerarToken(usuario.getEmail());
         return new RespostaAutenticacao(token, usuario.getNome(), usuario.getEmail());
@@ -122,6 +130,16 @@ public class ServicoAutenticacao {
         usuario.setTokenRedefinicaoHash(null);
         usuario.setTokenRedefinicaoExpiraEm(null);
         repositorioUsuario.save(usuario);
+    }
+
+    private void criarContaPadrao(Usuario usuario) {
+        Conta conta = new Conta();
+        conta.setUsuario(usuario);
+        conta.setNome("Pessoal");
+        conta.setCorFundo("#E1F5EE");
+        conta.setCorTexto("#0F6E56");
+
+        repositorioConta.save(conta);
     }
 
     private String sha256(String valor) {

@@ -34,26 +34,26 @@ public class ControladorTransacao {
      * Lista as transações do usuário autenticado, filtradas por conta se informado.
      *
      * @param autenticacao Autenticação do usuário atual
-     * @param conta Conta para filtrar (todas, cpf ou pj) — padrão "todas"
+     * @param contaId Id da conta para filtrar, ou null para todas as contas
      * @return Lista de transações
      */
     @GetMapping
     public ResponseEntity<List<RespostaTransacao>> listarTransacoes(Authentication autenticacao,
-                                                                      @RequestParam(defaultValue = "todas") String conta) {
-        return ResponseEntity.ok(servicoTransacao.listarTransacoes(autenticacao.getName(), conta));
+                                                                      @RequestParam(required = false) Long contaId) {
+        return ResponseEntity.ok(servicoTransacao.listarTransacoes(autenticacao.getName(), contaId));
     }
 
     /**
      * Retorna o resumo financeiro (saldo, entradas e saídas) do usuário autenticado.
      *
      * @param autenticacao Autenticação do usuário atual
-     * @param conta Conta para filtrar (todas, cpf ou pj) — padrão "todas"
+     * @param contaId Id da conta para filtrar, ou null para todas as contas
      * @return Resumo financeiro
      */
     @GetMapping("/resumo")
     public ResponseEntity<RespostaResumoSaldo> buscarResumo(Authentication autenticacao,
-                                                              @RequestParam(defaultValue = "todas") String conta) {
-        return ResponseEntity.ok(servicoTransacao.buscarResumo(autenticacao.getName(), conta));
+                                                              @RequestParam(required = false) Long contaId) {
+        return ResponseEntity.ok(servicoTransacao.buscarResumo(autenticacao.getName(), contaId));
     }
 
     /**

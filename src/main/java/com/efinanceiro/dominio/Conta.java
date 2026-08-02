@@ -2,8 +2,6 @@ package com.efinanceiro.dominio;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,16 +14,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 
 @Entity
-@Table(name = "transacoes")
+@Table(name = "contas")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Transacao {
+public class Conta {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,30 +31,14 @@ public class Transacao {
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;
 
-    @Column(nullable = false, length = 160)
-    private String descricao;
+    @Column(nullable = false, length = 120)
+    private String nome;
 
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal valor;
+    @Column(name = "cor_fundo", nullable = false, length = 7)
+    private String corFundo;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
-    private TipoTransacao tipo;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "conta_id", nullable = false)
-    private Conta conta;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private Categoria categoria;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cartao_id")
-    private Cartao cartao;
-
-    @Column(name = "data_transacao", nullable = false)
-    private LocalDate dataTransacao;
+    @Column(name = "cor_texto", nullable = false, length = 7)
+    private String corTexto;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;
