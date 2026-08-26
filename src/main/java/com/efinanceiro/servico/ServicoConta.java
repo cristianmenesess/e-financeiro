@@ -7,6 +7,7 @@ import com.efinanceiro.dto.resposta.RespostaConta;
 import com.efinanceiro.excecao.CredenciaisInvalidasException;
 import com.efinanceiro.excecao.RecursoNaoEncontradoException;
 import com.efinanceiro.repositorio.RepositorioConta;
+import com.efinanceiro.repositorio.RepositorioRecorrencia;
 import com.efinanceiro.repositorio.RepositorioTransacao;
 import com.efinanceiro.repositorio.RepositorioUsuario;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,15 +22,18 @@ public class ServicoConta {
     private final RepositorioConta repositorioConta;
     private final RepositorioUsuario repositorioUsuario;
     private final RepositorioTransacao repositorioTransacao;
+    private final RepositorioRecorrencia repositorioRecorrencia;
     private final PasswordEncoder codificadorDeSenha;
 
     public ServicoConta(RepositorioConta repositorioConta,
                          RepositorioUsuario repositorioUsuario,
                          RepositorioTransacao repositorioTransacao,
+                         RepositorioRecorrencia repositorioRecorrencia,
                          PasswordEncoder codificadorDeSenha) {
         this.repositorioConta = repositorioConta;
         this.repositorioUsuario = repositorioUsuario;
         this.repositorioTransacao = repositorioTransacao;
+        this.repositorioRecorrencia = repositorioRecorrencia;
         this.codificadorDeSenha = codificadorDeSenha;
     }
 
@@ -87,8 +91,9 @@ public class ServicoConta {
     }
 
     /**
-     * Exclui uma conta do usuário autenticado e todas as transações vinculadas a ela,
-     * mediante confirmação de senha (exclusão em cascata, por isso a confirmação extra).
+     * Exclui uma conta do usuário autenticado, junto com todas as transações e recorrências
+     * vinculadas a ela, mediante confirmação de senha (exclusão em cascata, por isso a
+     * confirmação extra).
      *
      * @param emailUsuario E-mail do usuário autenticado
      * @param id Id da conta a excluir
@@ -104,6 +109,7 @@ public class ServicoConta {
         }
 
         repositorioTransacao.deleteByContaId(conta.getId());
+        repositorioRecorrencia.deleteByContaId(conta.getId());
         repositorioConta.delete(conta);
     }
 

@@ -21,11 +21,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "transacoes")
+@Table(name = "recorrencias")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Transacao {
+public class Recorrencia {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,24 +45,23 @@ public class Transacao {
     @Column(nullable = false, length = 10)
     private TipoTransacao tipo;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "conta_id", nullable = false)
-    private Conta conta;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Categoria categoria;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "conta_id", nullable = false)
+    private Conta conta;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cartao_id")
     private Cartao cartao;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recorrencia_id")
-    private Recorrencia recorrencia;
+    @Column(name = "total_parcelas", nullable = false)
+    private Integer totalParcelas;
 
-    @Column(name = "data_transacao", nullable = false)
-    private LocalDate dataTransacao;
+    @Column(name = "data_inicio", nullable = false)
+    private LocalDate dataInicio;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;

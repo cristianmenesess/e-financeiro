@@ -70,8 +70,8 @@ public class ControladorConta {
     }
 
     /**
-     * Exclui uma conta do usuário autenticado e todas as transações vinculadas a ela.
-     * Exige a senha atual no corpo da requisição, por ser uma exclusão em cascata.
+     * Exclui uma conta do usuário autenticado, junto com todas as transações e recorrências
+     * vinculadas a ela. Exige a senha atual no corpo da requisição, por ser uma exclusão em cascata.
      *
      * @param autenticacao Autenticação do usuário atual
      * @param id Id da conta

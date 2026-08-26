@@ -54,4 +54,31 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
      * @param contaId Id da conta cujas transações serão apagadas
      */
     void deleteByContaId(Long contaId);
+
+    /**
+     * Conta quantas transações de uma recorrência ainda estão no futuro (não passaram) —
+     * usado pra calcular "parcelas restantes".
+     *
+     * @param recorrenciaId Id da recorrência
+     * @param data Data de referência (normalmente hoje) — conta transações com data >= essa
+     * @return Quantidade de transações futuras da recorrência
+     */
+    long countByRecorrenciaIdAndDataTransacaoGreaterThanEqual(Long recorrenciaId, LocalDate data);
+
+    /**
+     * Lista as transações futuras de uma recorrência — usado pra propagar edição de valor.
+     *
+     * @param recorrenciaId Id da recorrência
+     * @param data Data de referência (normalmente hoje) — lista transações com data >= essa
+     * @return Lista de transações futuras da recorrência
+     */
+    List<Transacao> findByRecorrenciaIdAndDataTransacaoGreaterThanEqual(Long recorrenciaId, LocalDate data);
+
+    /**
+     * Apaga as transações futuras de uma recorrência — usado ao cancelar parcelas futuras.
+     *
+     * @param recorrenciaId Id da recorrência
+     * @param data Data de referência (normalmente hoje) — apaga transações com data >= essa
+     */
+    void deleteByRecorrenciaIdAndDataTransacaoGreaterThanEqual(Long recorrenciaId, LocalDate data);
 }
