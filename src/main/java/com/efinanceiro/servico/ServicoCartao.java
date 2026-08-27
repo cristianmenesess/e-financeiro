@@ -113,11 +113,13 @@ public class ServicoCartao {
     }
 
     private BigDecimal calcularGastoNoMes(Long cartaoId) {
-        LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
-        LocalDate fimMes = inicioMes.withDayOfMonth(inicioMes.lengthOfMonth());
+        LocalDate hoje = LocalDate.now();
+        LocalDate inicioMes = hoje.withDayOfMonth(1);
 
+        // Parcelas futuras dentro do próprio mês corrente ainda não "aconteceram" —
+        // o intervalo vai só até hoje, mesmo que o mês ainda não tenha terminado.
         return repositorioTransacao
-                .findByCartaoIdAndTipoAndDataTransacaoBetween(cartaoId, TipoTransacao.SAIDA, inicioMes, fimMes)
+                .findByCartaoIdAndTipoAndDataTransacaoBetween(cartaoId, TipoTransacao.SAIDA, inicioMes, hoje)
                 .stream()
                 .map(Transacao::getValor)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

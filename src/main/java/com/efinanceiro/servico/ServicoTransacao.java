@@ -56,6 +56,8 @@ public class ServicoTransacao {
 
     /**
      * Calcula o resumo financeiro (saldo, entradas e saídas) do usuário autenticado, filtrado por conta se informado.
+     * Considera só transações já ocorridas (data <= hoje): parcelas futuras de recorrências ainda não
+     * "aconteceram" e não devem descontar o saldo disponível antes da hora.
      *
      * @param emailUsuario E-mail do usuário autenticado
      * @param contaId Id da conta para filtrar, ou null para todas as contas
@@ -64,7 +66,7 @@ public class ServicoTransacao {
     @Transactional(readOnly = true)
     public RespostaResumoSaldo buscarResumo(String emailUsuario, Long contaId) {
         Usuario usuario = buscarUsuario(emailUsuario);
-        List<Transacao> transacoes = buscarTransacoesFiltradas(usuario.getId(), contaId);
+        List<Transacao> transacoes = buscarTransacoesOcorridas(usuario.getId(), contaId);
 
         BigDecimal totalEntradas = somarPorTipo(transacoes, TipoTransacao.ENTRADA);
         BigDecimal totalSaidas = somarPorTipo(transacoes, TipoTransacao.SAIDA);
@@ -151,6 +153,16 @@ public class ServicoTransacao {
         }
 
         return repositorioTransacao.findByUsuarioIdAndContaIdOrderByDataTransacaoDesc(usuarioId, contaId);
+    }
+
+    private List<Transacao> buscarTransacoesOcorridas(Long usuarioId, Long contaId) {
+        LocalDate hoje = LocalDate.now();
+
+        if (contaId == null) {
+            return repositorioTransacao.findByUsuarioIdAndDataTransacaoLessThanEqual(usuarioId, hoje);
+        }
+
+        return repositorioTransacao.findByUsuarioIdAndContaIdAndDataTransacaoLessThanEqual(usuarioId, contaId, hoje);
     }
 
     private BigDecimal somarPorTipo(List<Transacao> transacoes, TipoTransacao tipo) {

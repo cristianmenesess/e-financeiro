@@ -28,6 +28,27 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
     List<Transacao> findByUsuarioIdAndContaIdOrderByDataTransacaoDesc(Long usuarioId, Long contaId);
 
     /**
+     * Lista as transações já ocorridas (até a data informada) de um usuário — usado no
+     * cálculo do saldo, que não deve contar parcelas futuras de recorrências.
+     *
+     * @param usuarioId Id do usuário dono das transações
+     * @param data Data de referência (normalmente hoje) — inclui transações com data <= essa
+     * @return Lista de transações já ocorridas
+     */
+    List<Transacao> findByUsuarioIdAndDataTransacaoLessThanEqual(Long usuarioId, LocalDate data);
+
+    /**
+     * Lista as transações já ocorridas (até a data informada) de um usuário, filtradas por conta —
+     * mesma finalidade da variante acima, para quando o saldo é filtrado por conta.
+     *
+     * @param usuarioId Id do usuário dono das transações
+     * @param contaId Id da conta para filtrar
+     * @param data Data de referência (normalmente hoje) — inclui transações com data <= essa
+     * @return Lista de transações já ocorridas na conta
+     */
+    List<Transacao> findByUsuarioIdAndContaIdAndDataTransacaoLessThanEqual(Long usuarioId, Long contaId, LocalDate data);
+
+    /**
      * Busca uma transação pelo id, garantindo que pertence ao usuário informado.
      *
      * @param id Id da transação
