@@ -49,8 +49,8 @@ public class Transacao {
     @JoinColumn(name = "conta_id", nullable = false)
     private Conta conta;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "categoria_id", nullable = false)
     private Categoria categoria;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -60,6 +60,9 @@ public class Transacao {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recorrencia_id")
     private Recorrencia recorrencia;
+
+    @Column(name = "numero_parcela")
+    private Integer numeroParcela;
 
     @Column(name = "data_transacao", nullable = false)
     private LocalDate dataTransacao;

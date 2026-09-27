@@ -5,6 +5,9 @@ import com.efinanceiro.dto.resposta.RespostaResumoSaldo;
 import com.efinanceiro.dto.resposta.RespostaTransacao;
 import com.efinanceiro.servico.ServicoTransacao;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,16 +34,34 @@ public class ControladorTransacao {
     }
 
     /**
-     * Lista as transações do usuário autenticado, filtradas por conta se informado.
+     * Lista as transações do usuário autenticado, filtradas por conta se informado. Sem
+     * {@code pagina}/{@code tamanho} devolve todas; com eles, só a página pedida — a resposta
+     * continua sendo uma lista, e o total de transações vai no cabeçalho {@code X-Total-Count}.
      *
      * @param autenticacao Autenticação do usuário atual
      * @param contaId Id da conta para filtrar, ou null para todas as contas
+     * @param pagina Número da página, começando em 0 (opcional)
+     * @param tamanho Itens por página, de 1 a 200 (opcional, padrão 50 quando só a página é informada)
      * @return Lista de transações
      */
     @GetMapping
-    public ResponseEntity<List<RespostaTransacao>> listarTransacoes(Authentication autenticacao,
-                                                                      @RequestParam(required = false) Long contaId) {
-        return ResponseEntity.ok(servicoTransacao.listarTransacoes(autenticacao.getName(), contaId));
+    public ResponseEntity<List<RespostaTransacao>> listarTransacoes(
+            Authentication autenticacao,
+            @RequestParam(required = false) Long contaId,
+            @RequestParam(required = false) @Min(value = 0, message = "A página deve ser 0 ou maior") Integer pagina,
+            @RequestParam(required = false)
+            @Min(value = 1, message = "O tamanho da página deve ser no mínimo 1")
+            @Max(value = 200, message = "O tamanho da página deve ser no máximo 200") Integer tamanho) {
+
+        Page<RespostaTransacao> transacoes = servicoTransacao.listarTransacoes(autenticacao.getName(), contaId, pagina, tamanho);
+
+        if (transacoes.getPageable().isUnpaged()) {
+            return ResponseEntity.ok(transacoes.getContent());
+        }
+
+        return ResponseEntity.ok()
+                .header("X-Total-Count", String.valueOf(transacoes.getTotalElements()))
+                .body(transacoes.getContent());
     }
 
     /**

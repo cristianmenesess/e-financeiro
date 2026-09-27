@@ -1,6 +1,8 @@
 package com.efinanceiro.seguranca;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,19 +10,29 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.function.Function;
 
 @Service
 public class ServicoJwt {
 
     private final SecretKey chaveAssinatura;
     private final long expiracaoMs;
+    private final Clock relogio;
+    private final JwtParser leitor;
 
     public ServicoJwt(@Value("${app.jwt.secret}") String segredo,
-                       @Value("${app.jwt.expiracao-ms}") long expiracaoMs) {
+                       @Value("${app.jwt.expiracao-ms}") long expiracaoMs,
+                       Clock relogio) {
         this.chaveAssinatura = Keys.hmacShaKeyFor(segredo.getBytes(StandardCharsets.UTF_8));
         this.expiracaoMs = expiracaoMs;
+        this.relogio = relogio;
+        this.leitor = Jwts.parser()
+                .verifyWith(chaveAssinatura)
+                .clock(() -> Date.from(relogio.instant()))
+                .build();
     }
 
     /**
@@ -30,7 +42,7 @@ public class ServicoJwt {
      * @return Token JWT assinado
      */
     public String gerarToken(String email) {
-        Date agora = new Date();
+        Date agora = Date.from(relogio.instant());
         Date expiracao = new Date(agora.getTime() + expiracaoMs);
 
         return Jwts.builder()
@@ -42,38 +54,35 @@ public class ServicoJwt {
     }
 
     /**
-     * Extrai o e-mail (subject) contido no token.
+     * Lê as claims de um token, validando assinatura e expiração.
      *
      * @param token Token JWT
-     * @return E-mail do usuário
+     * @return Claims do token (subject = e-mail, issuedAt = emissão)
+     * @throws JwtException se o token estiver malformado, com assinatura inválida ou expirado
      */
-    public String extrairEmail(String token) {
-        return extrairClaim(token, Claims::getSubject);
+    public Claims lerClaims(String token) {
+        return leitor.parseSignedClaims(token).getPayload();
     }
 
     /**
-     * Verifica se o token é válido para o e-mail informado (assinatura correta e não expirado).
+     * Verifica se o token foi emitido antes da última mudança de credenciais do usuário (troca de
+     * senha, troca de e-mail ou o próprio cadastro) — nesse caso ele não vale mais. Isso cobre tanto
+     * quem roubou o token e perde o acesso quando a senha é redefinida, quanto o e-mail do subject
+     * do token ter sido liberado por essa conta (troca ou exclusão) e reaproveitado por outra: toda
+     * conta nova já sai do cadastro com esse campo preenchido, então um token antigo nunca vale pra
+     * quem pegou o e-mail depois. Compara
+     * em segundos porque o "iat" do JWT não guarda milissegundos: sem isso, um login feito no mesmo
+     * segundo da mudança seria recusado.
      *
-     * @param token Token JWT
-     * @param email E-mail esperado
-     * @return true se o token for válido
+     * @param claims Claims do token já validado
+     * @param senhaAlteradaEm Momento da última mudança de credenciais, ou null em usuário antigo que nunca trocou senha nem e-mail
+     * @return true se o token for anterior à mudança de credenciais
      */
-    public boolean tokenValido(String token, String email) {
-        String emailDoToken = extrairEmail(token);
-        return emailDoToken.equals(email) && !tokenExpirado(token);
-    }
+    public boolean emitidoAntesDaTrocaDeSenha(Claims claims, Instant senhaAlteradaEm) {
+        if (senhaAlteradaEm == null || claims.getIssuedAt() == null) {
+            return false;
+        }
 
-    private boolean tokenExpirado(String token) {
-        return extrairClaim(token, Claims::getExpiration).before(new Date());
-    }
-
-    private <T> T extrairClaim(String token, Function<Claims, T> resolvedor) {
-        Claims claims = Jwts.parser()
-                .verifyWith(chaveAssinatura)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-
-        return resolvedor.apply(claims);
+        return claims.getIssuedAt().toInstant().isBefore(senhaAlteradaEm.truncatedTo(ChronoUnit.SECONDS));
     }
 }

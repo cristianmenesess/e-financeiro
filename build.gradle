@@ -25,6 +25,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	implementation 'com.bucket4j:bucket4j_jdk17-core:8.14.0'
+	implementation 'com.cloudinary:cloudinary-http5:2.3.0'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 	compileOnly 'org.projectlombok:lombok'
@@ -36,9 +38,21 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+// Só o jar executável do Spring Boot: sem o "-plain.jar", o COPY do Dockerfile encontra um único arquivo
+tasks.named('jar') {
+	enabled = false
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked']
 }
 
 tasks.named('test') {

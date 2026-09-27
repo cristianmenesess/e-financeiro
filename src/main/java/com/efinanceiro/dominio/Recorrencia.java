@@ -45,8 +45,8 @@ public class Recorrencia {
     @Column(nullable = false, length = 10)
     private TipoTransacao tipo;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "categoria_id", nullable = false)
     private Categoria categoria;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

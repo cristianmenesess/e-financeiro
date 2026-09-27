@@ -27,6 +27,7 @@ public class ConfiguracaoCors {
         configuracao.setAllowedOrigins(List.of(origensPermitidas.split(",")));
         configuracao.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuracao.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuracao.setExposedHeaders(List.of("X-Total-Count"));
         configuracao.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

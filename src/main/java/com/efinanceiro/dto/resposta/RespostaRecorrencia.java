@@ -1,6 +1,5 @@
 package com.efinanceiro.dto.resposta;
 
-import com.efinanceiro.dominio.Categoria;
 import com.efinanceiro.dominio.TipoTransacao;
 
 import java.math.BigDecimal;
@@ -11,7 +10,8 @@ public record RespostaRecorrencia(
         String descricao,
         BigDecimal valor,
         TipoTransacao tipo,
-        Categoria categoria,
+        Long categoriaId,
+        String nomeCategoria,
         Long contaId,
         String nomeConta,
         Long cartaoId,

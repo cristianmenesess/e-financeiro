@@ -5,11 +5,10 @@ import com.efinanceiro.dominio.Usuario;
 import com.efinanceiro.dto.requisicao.RequisicaoConta;
 import com.efinanceiro.dto.resposta.RespostaConta;
 import com.efinanceiro.excecao.CredenciaisInvalidasException;
-import com.efinanceiro.excecao.RecursoNaoEncontradoException;
+import com.efinanceiro.excecao.RegraDeNegocioException;
 import com.efinanceiro.repositorio.RepositorioConta;
 import com.efinanceiro.repositorio.RepositorioRecorrencia;
 import com.efinanceiro.repositorio.RepositorioTransacao;
-import com.efinanceiro.repositorio.RepositorioUsuario;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,23 +16,24 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
+@Transactional
 public class ServicoConta {
 
     private final RepositorioConta repositorioConta;
-    private final RepositorioUsuario repositorioUsuario;
     private final RepositorioTransacao repositorioTransacao;
     private final RepositorioRecorrencia repositorioRecorrencia;
+    private final BuscadorRecursosDoUsuario buscadorRecursosDoUsuario;
     private final PasswordEncoder codificadorDeSenha;
 
     public ServicoConta(RepositorioConta repositorioConta,
-                         RepositorioUsuario repositorioUsuario,
                          RepositorioTransacao repositorioTransacao,
                          RepositorioRecorrencia repositorioRecorrencia,
+                         BuscadorRecursosDoUsuario buscadorRecursosDoUsuario,
                          PasswordEncoder codificadorDeSenha) {
         this.repositorioConta = repositorioConta;
-        this.repositorioUsuario = repositorioUsuario;
         this.repositorioTransacao = repositorioTransacao;
         this.repositorioRecorrencia = repositorioRecorrencia;
+        this.buscadorRecursosDoUsuario = buscadorRecursosDoUsuario;
         this.codificadorDeSenha = codificadorDeSenha;
     }
 
@@ -43,8 +43,9 @@ public class ServicoConta {
      * @param emailUsuario E-mail do usuário autenticado
      * @return Lista de contas do usuário
      */
+    @Transactional(readOnly = true)
     public List<RespostaConta> listarContas(String emailUsuario) {
-        Usuario usuario = buscarUsuario(emailUsuario);
+        Usuario usuario = buscadorRecursosDoUsuario.buscarUsuario(emailUsuario);
 
         return repositorioConta.findByUsuarioId(usuario.getId()).stream()
                 .map(this::paraResposta)
@@ -59,7 +60,7 @@ public class ServicoConta {
      * @return Conta criada
      */
     public RespostaConta criarConta(String emailUsuario, RequisicaoConta requisicao) {
-        Usuario usuario = buscarUsuario(emailUsuario);
+        Usuario usuario = buscadorRecursosDoUsuario.buscarUsuario(emailUsuario);
 
         Conta conta = new Conta();
         conta.setUsuario(usuario);
@@ -80,7 +81,8 @@ public class ServicoConta {
      * @return Conta atualizada
      */
     public RespostaConta atualizarConta(String emailUsuario, Long id, RequisicaoConta requisicao) {
-        Conta conta = buscarContaDoUsuario(emailUsuario, id);
+        Usuario usuario = buscadorRecursosDoUsuario.buscarUsuario(emailUsuario);
+        Conta conta = buscadorRecursosDoUsuario.buscarConta(id, usuario.getId());
 
         conta.setNome(requisicao.nome());
         conta.setCorFundo(requisicao.corFundo());
@@ -93,40 +95,28 @@ public class ServicoConta {
     /**
      * Exclui uma conta do usuário autenticado, junto com todas as transações e recorrências
      * vinculadas a ela, mediante confirmação de senha (exclusão em cascata, por isso a
-     * confirmação extra).
+     * confirmação extra). A última conta não pode ser excluída — sem conta, o usuário não
+     * conseguiria lançar nenhuma transação.
      *
      * @param emailUsuario E-mail do usuário autenticado
      * @param id Id da conta a excluir
      * @param senha Senha atual do usuário, pra confirmar a exclusão
      */
-    @Transactional
     public void excluirConta(String emailUsuario, Long id, String senha) {
-        Usuario usuario = buscarUsuario(emailUsuario);
-        Conta conta = buscarContaDoUsuario(usuario, id);
+        Usuario usuario = buscadorRecursosDoUsuario.buscarUsuario(emailUsuario);
+        Conta conta = buscadorRecursosDoUsuario.buscarConta(id, usuario.getId());
 
         if (!codificadorDeSenha.matches(senha, usuario.getSenhaHash())) {
             throw new CredenciaisInvalidasException("Senha incorreta");
         }
 
+        if (repositorioConta.countByUsuarioId(usuario.getId()) <= 1) {
+            throw new RegraDeNegocioException("Não é possível excluir a única conta. Crie outra conta antes de excluir esta.");
+        }
+
         repositorioTransacao.deleteByContaId(conta.getId());
         repositorioRecorrencia.deleteByContaId(conta.getId());
         repositorioConta.delete(conta);
-    }
-
-    private Conta buscarContaDoUsuario(String emailUsuario, Long id) {
-        Usuario usuario = buscarUsuario(emailUsuario);
-
-        return buscarContaDoUsuario(usuario, id);
-    }
-
-    private Conta buscarContaDoUsuario(Usuario usuario, Long id) {
-        return repositorioConta.findByIdAndUsuarioId(id, usuario.getId())
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Conta não encontrada"));
-    }
-
-    private Usuario buscarUsuario(String email) {
-        return repositorioUsuario.findByEmail(email)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
     }
 
     private RespostaConta paraResposta(Conta conta) {

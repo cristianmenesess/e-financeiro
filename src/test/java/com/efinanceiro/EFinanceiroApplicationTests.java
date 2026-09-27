@@ -1,10 +1,9 @@
 package com.efinanceiro;
 
+import com.efinanceiro.suporte.TesteIntegracao;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class EFinanceiroApplicationTests {
+class EFinanceiroApplicationTests extends TesteIntegracao {
 
 	@Test
 	void contextLoads() {

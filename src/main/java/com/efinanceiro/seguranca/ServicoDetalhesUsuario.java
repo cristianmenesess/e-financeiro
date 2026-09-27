@@ -2,13 +2,10 @@ package com.efinanceiro.seguranca;
 
 import com.efinanceiro.dominio.Usuario;
 import com.efinanceiro.repositorio.RepositorioUsuario;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-
-import java.util.Collections;
 
 @Service
 public class ServicoDetalhesUsuario implements UserDetailsService {
@@ -20,16 +17,16 @@ public class ServicoDetalhesUsuario implements UserDetailsService {
     }
 
     /**
-     * Carrega os detalhes de autenticação de um usuário a partir do e-mail.
+     * Carrega os detalhes de autenticação de um usuário a partir do e-mail gravado no token.
      *
      * @param email E-mail usado como identificador de login
-     * @return Detalhes do usuário para o Spring Security
+     * @return Usuário autenticado (id, e-mail, hash da senha e data da última troca de senha)
      */
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         Usuario usuario = repositorioUsuario.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + email));
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário do token não existe mais"));
 
-        return new User(usuario.getEmail(), usuario.getSenhaHash(), Collections.emptyList());
+        return new UsuarioAutenticado(usuario.getId(), usuario.getEmail(), usuario.getSenhaHash(), usuario.getSenhaAlteradaEm());
     }
 }

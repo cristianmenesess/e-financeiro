@@ -2,10 +2,12 @@ package com.efinanceiro.dto.requisicao;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 public record RequisicaoCartao(
 
         @NotBlank(message = "O nome do cartão é obrigatório")
+        @Size(max = 120, message = "O nome do cartão deve ter no máximo 120 caracteres")
         String nome,
 
         @NotBlank(message = "A cor de fundo é obrigatória")

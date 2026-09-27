@@ -55,15 +55,15 @@ public class ControladorRecorrencia {
     }
 
     /**
-     * Cancela as parcelas futuras de uma recorrência do usuário autenticado.
+     * Exclui uma recorrência do usuário autenticado, junto com todas as parcelas dela.
      *
      * @param autenticacao Autenticação do usuário atual
      * @param id Id da recorrência
      * @return Resposta vazia com status 204
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> cancelarFuturas(Authentication autenticacao, @PathVariable Long id) {
-        servicoRecorrencia.cancelarFuturas(autenticacao.getName(), id);
+    public ResponseEntity<Void> excluirRecorrencia(Authentication autenticacao, @PathVariable Long id) {
+        servicoRecorrencia.excluirRecorrencia(autenticacao.getName(), id);
         return ResponseEntity.noContent().build();
     }
 

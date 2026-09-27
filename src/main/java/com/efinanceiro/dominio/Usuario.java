@@ -42,6 +42,15 @@ public class Usuario {
     @Column(name = "token_redefinicao_expira_em")
     private Instant tokenRedefinicaoExpiraEm;
 
+    // Marca a última mudança de credenciais (senha OU e-mail) e também o cadastro: tokens JWT
+    // emitidos antes desse instante são recusados pelo filtro. Só é nulo em usuários antigos
+    // (anteriores à V6) que nunca trocaram senha nem e-mail
+    @Column(name = "senha_alterada_em")
+    private Instant senhaAlteradaEm;
+
+    @Column(name = "foto_url", length = 500)
+    private String fotoUrl;
+
     @PrePersist
     private void aoPersistir() {
         this.criadoEm = Instant.now();
