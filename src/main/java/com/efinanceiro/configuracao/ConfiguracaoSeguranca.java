@@ -29,8 +29,9 @@ public class ConfiguracaoSeguranca {
 
     /**
      * Define a cadeia de filtros de segurança da aplicação: desabilita CSRF (API stateless),
-     * libera as rotas de autenticação, exige token JWT para o restante da API e responde
-     * 401 (em vez do 403 padrão do Spring Security) quando a requisição não traz token nenhum.
+     * libera as rotas de autenticação e o health check de liveness (usado pelo monitoramento),
+     * exige token JWT para o restante da API e responde 401 (em vez do 403 padrão do Spring
+     * Security) quando a requisição não traz token nenhum.
      *
      * @param http Configuração HTTP do Spring Security
      * @return Cadeia de filtros configurada
@@ -46,6 +47,7 @@ public class ConfiguracaoSeguranca {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/autenticacao/**").permitAll()
+                        .requestMatchers("/actuator/health/liveness").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(filtroAutenticacaoJwt, UsernamePasswordAuthenticationFilter.class);

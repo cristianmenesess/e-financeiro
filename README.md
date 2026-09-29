@@ -4,8 +4,7 @@ Um back-end robusto para controle financeiro pessoal, focado em boas práticas, 
 
 O desenvolvimento priorizou práticas de mercado, como o uso rigoroso de DTOs para evitar exposição de entidades, tratamento de valores monetários com `BigDecimal` de ponta a ponta, autenticação stateless, agregações feitas no banco (sem somar em memória) e testes de integração contra um PostgreSQL real.
 
-**Acesse o site:** https://e-financeiro.vercel.app/ <br>
-*(Nota: Hospedado no Render no plano gratuito. A primeira requisição pode levar até 60 segundos para "acordar" o servidor).*
+**Acesse o site:** https://e-financeiro.vercel.app/
 
 ---
 
