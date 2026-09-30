@@ -4,6 +4,7 @@ import com.efinanceiro.dominio.Cartao;
 import com.efinanceiro.dominio.Categoria;
 import com.efinanceiro.dominio.Conta;
 import com.efinanceiro.dominio.Recorrencia;
+import com.efinanceiro.dominio.TipoTransacao;
 import com.efinanceiro.dominio.Transacao;
 import com.efinanceiro.dominio.Usuario;
 import com.efinanceiro.dto.requisicao.RequisicaoRecorrencia;
@@ -85,26 +86,49 @@ public class ServicoRecorrencia {
             throw new DadosInvalidosException("A categoria não é do mesmo tipo da movimentação");
         }
 
+        Recorrencia recorrencia = gerarRecorrencia(usuario, conta, cartao, categoria, requisicao.descricao(), requisicao.valor(),
+                requisicao.tipo(), requisicao.totalParcelas(), dataInicio);
+
+        return paraResposta(recorrencia, contarParcelasRestantes(recorrencia));
+    }
+
+    /**
+     * Cria uma recorrência com todas as parcelas mensais a partir da data de início. Quem chama já
+     * validou os dados e resolveu conta, cartão e categoria.
+     *
+     * @param usuario Dono da recorrência
+     * @param conta Conta das parcelas
+     * @param cartao Cartão das parcelas, ou null
+     * @param categoria Categoria (do mesmo tipo)
+     * @param descricao Descrição
+     * @param valor Valor de cada parcela
+     * @param tipo Entrada ou saída
+     * @param totalParcelas Quantidade de parcelas
+     * @param dataInicio Data da primeira parcela
+     * @return Recorrência criada
+     */
+    public Recorrencia gerarRecorrencia(Usuario usuario, Conta conta, Cartao cartao, Categoria categoria, String descricao,
+                                        BigDecimal valor, TipoTransacao tipo, int totalParcelas, LocalDate dataInicio) {
         Recorrencia recorrencia = new Recorrencia();
         recorrencia.setUsuario(usuario);
-        recorrencia.setDescricao(requisicao.descricao());
-        recorrencia.setValor(requisicao.valor());
-        recorrencia.setTipo(requisicao.tipo());
+        recorrencia.setDescricao(descricao);
+        recorrencia.setValor(valor);
+        recorrencia.setTipo(tipo);
         recorrencia.setCategoria(categoria);
         recorrencia.setConta(conta);
         recorrencia.setCartao(cartao);
-        recorrencia.setTotalParcelas(requisicao.totalParcelas());
+        recorrencia.setTotalParcelas(totalParcelas);
         recorrencia.setDataInicio(dataInicio);
         repositorioRecorrencia.save(recorrencia);
 
         List<Transacao> parcelas = new ArrayList<>();
 
-        for (int i = 0; i < requisicao.totalParcelas(); i++) {
+        for (int i = 0; i < totalParcelas; i++) {
             Transacao transacao = new Transacao();
             transacao.setUsuario(usuario);
-            transacao.setDescricao(requisicao.descricao());
-            transacao.setValor(requisicao.valor());
-            transacao.setTipo(requisicao.tipo());
+            transacao.setDescricao(descricao);
+            transacao.setValor(valor);
+            transacao.setTipo(tipo);
             transacao.setCategoria(categoria);
             transacao.setConta(conta);
             transacao.setCartao(cartao);
@@ -115,8 +139,7 @@ public class ServicoRecorrencia {
         }
 
         repositorioTransacao.saveAll(parcelas);
-
-        return paraResposta(recorrencia, contarParcelasRestantes(recorrencia));
+        return recorrencia;
     }
 
     /**

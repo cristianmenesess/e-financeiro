@@ -239,6 +239,19 @@ public class TratadorGlobalDeExcecoes {
     }
 
     /**
+     * Trata importação de planilha com erros: devolve a lista de erros (linha, coluna e motivo).
+     *
+     * @param excecao Exceção com os erros da planilha
+     * @return Corpo de erro com a lista de erros, status 400
+     */
+    @ExceptionHandler(ImportacaoInvalidaException.class)
+    public ResponseEntity<Map<String, Object>> tratarImportacaoInvalida(ImportacaoInvalidaException excecao) {
+        Map<String, Object> corpo = corpoDeErro(excecao.getMessage());
+        corpo.put("erros", excecao.getErros());
+        return ResponseEntity.badRequest().body(corpo);
+    }
+
+    /**
      * Trata falha de um serviço externo (ex: Cloudinary fora do ar). O detalhe fica no log de quem
      * lançou a exceção; aqui só volta uma mensagem amigável.
      *

@@ -34,6 +34,17 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
     Page<Transacao> findByUsuarioId(Long usuarioId, Pageable paginacao);
 
     /**
+     * Lista as transações de um usuário num intervalo de datas — usado pra detectar possíveis
+     * duplicados numa importação.
+     *
+     * @param usuarioId Id do usuário
+     * @param inicio Data inicial (inclusive)
+     * @param fim Data final (inclusive)
+     * @return Transações do período
+     */
+    List<Transacao> findByUsuarioIdAndDataTransacaoBetween(Long usuarioId, LocalDate inicio, LocalDate fim);
+
+    /**
      * Lista as transações de um usuário filtradas por conta — mesma finalidade da variante acima.
      *
      * @param usuarioId Id do usuário dono das transações

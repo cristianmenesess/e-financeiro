@@ -31,6 +31,7 @@ O desenvolvimento priorizou práticas de mercado, como o uso rigoroso de DTOs pa
 - **Gestão de Cartões:** CRUD completo com cálculo automático do gasto do mês baseado nas transações associadas.
 - **Controle de Transações:** Registro de receitas e despesas com filtro por conta e paginação opcional.
 - **Categorias:** 5 categorias fixas do sistema (Renda, Despesa, Alimentação, Moradia, Outro) + categorias de entrada e saída criadas por cada usuário, com ícone e cor.
+- **Importação e Exportação:** Importa movimentações de uma planilha CSV no modelo do sistema (prévia com erros por linha e coluna, tudo ou nada, parcelas viram recorrências) e exporta as movimentações no mesmo formato.
 - **Recorrências:** Compras parceladas e gastos/entradas fixas geram todas as parcelas de uma vez; o valor das parcelas futuras pode ser reajustado.
 - **Resumo Financeiro:** Endpoint dedicado para entregar o balanço atualizado (saldo, total de entradas e saídas), sem contar parcelas futuras.
 
@@ -135,3 +136,11 @@ Todas as rotas (exceto autenticação) exigem o envio do header: `Authorization:
 | POST | `/api/categorias` | Cria uma categoria personalizada (nome, tipo, ícone e cor; até 50 por usuário) |
 | PUT | `/api/categorias/{id}` | Edita nome, ícone e cor (o tipo não muda) |
 | DELETE | `/api/categorias/{id}` | Exclui a categoria e move as movimentações dela para "Outro" (saída) ou "Renda" (entrada) |
+
+### Planilhas
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/planilhas/modelo` | Baixa o modelo de planilha CSV |
+| POST | `/api/planilhas/previa` | Analisa uma planilha (multipart `arquivo` + `contaPadraoId`) sem gravar nada |
+| POST | `/api/planilhas/importar` | Importa a planilha (tudo ou nada; `linhasDuplicadasIncluidas` opcional) |
+| GET | `/api/planilhas/exportar` | Baixa todas as movimentações em CSV no formato do modelo |
