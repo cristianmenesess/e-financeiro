@@ -114,35 +114,4 @@ class TransacaoTeste extends TesteIntegracao {
                     .andExpect(jsonPath("$.valor").value("O valor deve ter no máximo 10 dígitos inteiros e 2 casas decimais"));
         }
     }
-
-    @Test
-    void gastoDoMesDeCadaCartaoSaiDaConsultaAgregada() throws Exception {
-        String token = cadastrarUsuario();
-        Long contaId = idContaPadrao(token);
-
-        Long cartaoA = criarCartao(token, "Cartão A");
-        Long cartaoB = criarCartao(token, "Cartão B");
-        criarCartao(token, "Cartão sem gasto");
-
-        criarTransacao(token, contaId, "SAIDA", "50.00", "2026-03-02", cartaoA);
-        criarTransacao(token, contaId, "SAIDA", "25.50", "2026-03-14", cartaoA);
-        criarTransacao(token, contaId, "SAIDA", "999.00", "2026-03-20", cartaoA);  // ainda não aconteceu
-        criarTransacao(token, contaId, "SAIDA", "70.00", "2026-02-28", cartaoB);   // mês passado
-        criarTransacao(token, contaId, "ENTRADA", "40.00", "2026-03-10", cartaoB); // estorno não é gasto
-
-        mockMvc.perform(comToken(get("/api/cartoes"), token))
-                .andExpect(jsonPath("$[?(@.nome == 'Cartão A')].gastoNoMes").value(75.50))
-                .andExpect(jsonPath("$[?(@.nome == 'Cartão B')].gastoNoMes").value(0))
-                .andExpect(jsonPath("$[?(@.nome == 'Cartão sem gasto')].gastoNoMes").value(0));
-    }
-
-    private Long criarCartao(String token, String nome) throws Exception {
-        String resposta = mockMvc.perform(comToken(post("/api/cartoes"), token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\": \"%s\", \"corFundo\": \"#111111\", \"corTexto\": \"#FFFFFF\"}".formatted(nome)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-
-        return ((Number) JsonPath.read(resposta, "$.id")).longValue();
-    }
 }

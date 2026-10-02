@@ -28,11 +28,12 @@ O desenvolvimento priorizou práticas de mercado, como o uso rigoroso de DTOs pa
 - **Perfil do Usuário:** Troca de nome, e-mail e senha, foto de perfil (Cloudinary) e exclusão do próprio cadastro com todos os dados.
 - **Proteção contra Força Bruta:** Limite de tentativas por IP e por e-mail no login, cadastro e redefinição de senha.
 - **Gestão de Contas:** Contas criadas pelo usuário (nome e cor); todo cadastro já nasce com a conta "Pessoal", e a última conta não pode ser excluída.
-- **Gestão de Cartões:** CRUD completo com cálculo automático do gasto do mês baseado nas transações associadas.
+- **Gestão de Cartões:** Gestão do dia de fechamento e de vencimento da fatura de cada cartão; compras no cartão (à vista ou parceladas) caem no vencimento da fatura certa, e cada cartão mostra o total da fatura atual.
 - **Controle de Transações:** Registro de receitas e despesas com filtro por conta e paginação opcional.
 - **Categorias:** 5 categorias fixas do sistema (Renda, Despesa, Alimentação, Moradia, Outro) + categorias de entrada e saída criadas por cada usuário, com ícone e cor.
 - **Importação e Exportação:** Importa movimentações de uma planilha CSV no modelo do sistema (prévia com erros por linha e coluna, tudo ou nada, parcelas viram recorrências) e exporta as movimentações no mesmo formato.
-- **Recorrências:** Compras parceladas e gastos/entradas fixas geram todas as parcelas de uma vez; o valor das parcelas futuras pode ser reajustado.
+- **Recorrências:** Compras parceladas e gastos/entradas fixas geram todas as parcelas de uma vez; qualquer dado pode ser editado, refazendo só as parcelas futuras ou todas.
+- **Assinaturas:** Cobranças mensais ou anuais sem data de fim (no cartão, cada uma cai na fatura certa), lançadas até 12 meses à frente e completadas no login e por uma tarefa agendada; dá pra editar, cancelar (as cobranças passadas ficam) ou excluir com todas as cobranças.
 - **Resumo Financeiro:** Endpoint dedicado para entregar o balanço atualizado (saldo, total de entradas e saídas), sem contar parcelas futuras.
 
 ---
@@ -101,14 +102,14 @@ Todas as rotas (exceto autenticação) exigem o envio do header: `Authorization:
 | GET | `/api/contas` | Lista as contas do usuário autenticado |
 | POST | `/api/contas` | Cria uma conta |
 | PUT | `/api/contas/{id}` | Atualiza uma conta |
-| DELETE | `/api/contas/{id}` | Exclui a conta com suas transações e recorrências (exige `{ "senha": "..." }` no corpo; a última conta não pode ser excluída) |
+| DELETE | `/api/contas/{id}` | Exclui a conta com suas transações, recorrências e assinaturas (exige `{ "senha": "..." }` no corpo; a última conta não pode ser excluída) |
 
 ### Cartões
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/api/cartoes` | Lista os cartões do usuário autenticado, com o gasto do mês |
-| POST | `/api/cartoes` | Cria um cartão |
-| PUT | `/api/cartoes/{id}` | Atualiza um cartão |
+| GET | `/api/cartoes` | Lista os cartões do usuário autenticado, com o total e o vencimento da fatura atual |
+| POST | `/api/cartoes` | Cria um cartão (nome, cores, `diaFechamento` e `diaVencimento`) |
+| PUT | `/api/cartoes/{id}` | Atualiza um cartão (mudar o ciclo move as compras futuras para a nova fatura) |
 | DELETE | `/api/cartoes/{id}` | Exclui um cartão (as transações dele continuam, sem cartão) |
 
 ### Transações
@@ -116,7 +117,7 @@ Todas as rotas (exceto autenticação) exigem o envio do header: `Authorization:
 |---|---|---|
 | GET | `/api/transacoes?contaId={id}&pagina={n}&tamanho={n}` | Lista as transações (filtro por conta e paginação opcionais; paginado, o total vem no header `X-Total-Count`) |
 | GET | `/api/transacoes/resumo?contaId={id}` | Saldo, total de entradas e total de saídas até hoje (conta opcional) |
-| POST | `/api/transacoes` | Cria uma transação (com categoriaId de uma categoria do mesmo tipo) |
+| POST | `/api/transacoes` | Cria uma transação (com categoriaId de uma categoria do mesmo tipo; com cartão, a data informada é a da compra) |
 | PUT | `/api/transacoes/{id}` | Atualiza uma transação |
 | DELETE | `/api/transacoes/{id}` | Exclui uma transação |
 
@@ -125,8 +126,17 @@ Todas as rotas (exceto autenticação) exigem o envio do header: `Authorization:
 |---|---|---|
 | GET | `/api/recorrencias` | Lista as recorrências, com as parcelas restantes |
 | POST | `/api/recorrencias` | Cria uma recorrência e gera todas as parcelas mensais |
-| PUT | `/api/recorrencias/{id}/valor` | Reajusta o valor das parcelas futuras (as de hoje e as passadas não mudam) |
+| PUT | `/api/recorrencias/{id}` | Edita qualquer dado; `alcance` `FUTURAS` (padrão, as parcelas até hoje não mudam) ou `TODAS` (refaz todas) |
 | DELETE | `/api/recorrencias/{id}` | Exclui a recorrência com todas as parcelas, inclusive as passadas |
+
+### Assinaturas
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/assinaturas` | Lista as assinaturas (ativas primeiro), com a próxima cobrança |
+| POST | `/api/assinaturas` | Cria uma assinatura (`periodicidade` `MENSAL` ou `ANUAL`) e lança as cobranças |
+| PUT | `/api/assinaturas/{id}` | Edita uma assinatura ativa; `alcance` `FUTURAS` (padrão) ou `TODAS` |
+| POST | `/api/assinaturas/{id}/cancelar` | Cancela: apaga as cobranças depois de hoje e mantém as passadas |
+| DELETE | `/api/assinaturas/{id}` | Exclui a assinatura com todas as cobranças, inclusive as passadas |
 
 ### Categorias
 | Método | Rota | Descrição |
@@ -142,5 +152,5 @@ Todas as rotas (exceto autenticação) exigem o envio do header: `Authorization:
 |---|---|---|
 | GET | `/api/planilhas/modelo` | Baixa o modelo de planilha CSV |
 | POST | `/api/planilhas/previa` | Analisa uma planilha (multipart `arquivo` + `contaPadraoId`) sem gravar nada |
-| POST | `/api/planilhas/importar` | Importa a planilha (tudo ou nada; `linhasDuplicadasIncluidas` opcional) |
+| POST | `/api/planilhas/importar` | Importa a planilha (tudo ou nada; `linhasDuplicadasIncluidas` opcional; parte JSON `cartoesNovos` com fechamento e vencimento dos cartões que serão criados) |
 | GET | `/api/planilhas/exportar` | Baixa todas as movimentações em CSV no formato do modelo |

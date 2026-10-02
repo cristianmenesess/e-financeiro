@@ -61,11 +61,19 @@ public class Transacao {
     @JoinColumn(name = "recorrencia_id")
     private Recorrencia recorrencia;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assinatura_id")
+    private Assinatura assinatura;
+
     @Column(name = "numero_parcela")
     private Integer numeroParcela;
 
     @Column(name = "data_transacao", nullable = false)
     private LocalDate dataTransacao;
+
+    // Só com cartão: a data da compra; a data da transação é o vencimento da fatura
+    @Column(name = "data_compra")
+    private LocalDate dataCompra;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;

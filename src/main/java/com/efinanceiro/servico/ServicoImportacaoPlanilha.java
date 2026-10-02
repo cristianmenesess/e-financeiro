@@ -6,6 +6,7 @@ import com.efinanceiro.dominio.Conta;
 import com.efinanceiro.dominio.TipoTransacao;
 import com.efinanceiro.dominio.Transacao;
 import com.efinanceiro.dominio.Usuario;
+import com.efinanceiro.dto.requisicao.RequisicaoCartaoImportado;
 import com.efinanceiro.dto.resposta.ErroImportacao;
 import com.efinanceiro.dto.resposta.LinhaPrevia;
 import com.efinanceiro.dto.resposta.RespostaImportacao;
@@ -81,8 +82,9 @@ public class ServicoImportacaoPlanilha {
             return totalParcelas != null;
         }
 
+        // Com cartão, todas as parcelas trazem a data da compra; sem cartão, cada uma traz a própria data
         LocalDate dataInicio() {
-            return data.minusMonths(parcelaAtual - 1L);
+            return cartao != null ? data : data.minusMonths(parcelaAtual - 1L);
         }
     }
 
@@ -128,9 +130,11 @@ public class ServicoImportacaoPlanilha {
      * @param arquivo Bytes do CSV
      * @param contaPadraoId Conta usada nas linhas sem a coluna conta
      * @param duplicadasIncluidas Números das linhas marcadas como duplicado que devem ser importadas mesmo assim
+     * @param cartoesNovos Fechamento e vencimento de cada cartão que a importação vai criar
      * @return Quantidades importadas, criadas e puladas
      */
-    public RespostaImportacao importar(String emailUsuario, byte[] arquivo, Long contaPadraoId, Set<Integer> duplicadasIncluidas) {
+    public RespostaImportacao importar(String emailUsuario, byte[] arquivo, Long contaPadraoId, Set<Integer> duplicadasIncluidas,
+                                       List<RequisicaoCartaoImportado> cartoesNovos) {
         Analise analise = analisar(emailUsuario, arquivo, contaPadraoId);
 
         if (!analise.erros().isEmpty()) {
@@ -165,9 +169,11 @@ public class ServicoImportacaoPlanilha {
         List<LinhaValidada> usadas = new ArrayList<>(avulsas);
         grupos.forEach(grupo -> usadas.add(grupo.get(0)));
 
+        Map<String, RequisicaoCartaoImportado> ciclosCartoesNovos = validarCicloCartoesNovos(analise, usadas, cartoesNovos);
+
         int categoriasCriadas = criarCategoriasUsadas(analise, usadas);
         int contasCriadas = criarContasUsadas(analise, usadas);
-        int cartoesCriados = criarCartoesUsados(analise, usadas);
+        int cartoesCriados = criarCartoesUsados(analise, usadas, ciclosCartoesNovos);
 
         List<Transacao> transacoes = avulsas.stream().map(linha -> paraTransacao(analise, linha)).toList();
         repositorioTransacao.saveAll(transacoes);
@@ -486,8 +492,10 @@ public class ServicoImportacaoPlanilha {
         LocalDate inicio = linhas.stream().map(LinhaValidada::data).min(LocalDate::compareTo).orElseThrow();
         LocalDate fim = linhas.stream().map(LinhaValidada::data).max(LocalDate::compareTo).orElseThrow();
 
-        Set<String> existentes = repositorioTransacao.findByUsuarioIdAndDataTransacaoBetween(usuario.getId(), inicio, fim).stream()
-                .map(transacao -> chaveDuplicado(transacao.getDataTransacao(), transacao.getDescricao(), transacao.getValor(), transacao.getConta().getId()))
+        // Com cartão, a planilha traz a data da compra
+        Set<String> existentes = repositorioTransacao.buscarPorDataInformada(usuario.getId(), inicio, fim).stream()
+                .map(transacao -> chaveDuplicado(transacao.getDataCompra() != null ? transacao.getDataCompra() : transacao.getDataTransacao(),
+                        transacao.getDescricao(), transacao.getValor(), transacao.getConta().getId()))
                 .collect(Collectors.toSet());
 
         for (LinhaValidada linha : linhas) {
@@ -547,16 +555,57 @@ public class ServicoImportacaoPlanilha {
         return criadas;
     }
 
-    private int criarCartoesUsados(Analise analise, List<LinhaValidada> usadas) {
+    // Cartão criado pela importação precisa do fechamento e do vencimento, informados na prévia
+    private Map<String, RequisicaoCartaoImportado> validarCicloCartoesNovos(Analise analise, List<LinhaValidada> usadas,
+                                                                           List<RequisicaoCartaoImportado> cartoesNovos) {
+        Map<String, RequisicaoCartaoImportado> ciclos = new HashMap<>();
+        cartoesNovos.stream()
+                .filter(cartao -> cartao.nome() != null)
+                .forEach(cartao -> ciclos.putIfAbsent(ColunasPlanilha.normalizar(cartao.nome()), cartao));
+
+        List<ErroImportacao> erros = new ArrayList<>();
+        Set<String> verificados = new HashSet<>();
+
+        for (LinhaValidada linha : usadas) {
+            String chave = ColunasPlanilha.normalizar(linha.cartao());
+
+            if (linha.cartao() == null || analise.cartoes().containsKey(chave) || !verificados.add(chave)) {
+                continue;
+            }
+
+            RequisicaoCartaoImportado ciclo = ciclos.get(chave);
+
+            if (ciclo == null || !diaDoMesValido(ciclo.diaFechamento()) || !diaDoMesValido(ciclo.diaVencimento())) {
+                erros.add(new ErroImportacao(0, ColunasPlanilha.CARTAO,
+                        "Informe o fechamento e o vencimento (dia de 1 a 31) do cartão novo '" + trecho(linha.cartao()) + "'"));
+            }
+        }
+
+        if (!erros.isEmpty()) {
+            throw new ImportacaoInvalidaException(erros);
+        }
+
+        return ciclos;
+    }
+
+    private boolean diaDoMesValido(Integer dia) {
+        return dia != null && dia >= 1 && dia <= 31;
+    }
+
+    private int criarCartoesUsados(Analise analise, List<LinhaValidada> usadas, Map<String, RequisicaoCartaoImportado> ciclos) {
         int criados = 0;
 
         for (LinhaValidada linha : usadas) {
             if (linha.cartao() != null && !analise.cartoes().containsKey(ColunasPlanilha.normalizar(linha.cartao()))) {
+                RequisicaoCartaoImportado ciclo = ciclos.get(ColunasPlanilha.normalizar(linha.cartao()));
+
                 Cartao cartao = new Cartao();
                 cartao.setUsuario(analise.usuario());
                 cartao.setNome(linha.cartao());
                 cartao.setCorFundo(COR_FUNDO_PADRAO);
                 cartao.setCorTexto(COR_TEXTO_PADRAO);
+                cartao.setDiaFechamento(ciclo.diaFechamento());
+                cartao.setDiaVencimento(ciclo.diaVencimento());
                 repositorioCartao.save(cartao);
                 analise.cartoes().put(ColunasPlanilha.normalizar(linha.cartao()), cartao);
                 criados++;
@@ -572,10 +621,10 @@ public class ServicoImportacaoPlanilha {
         transacao.setDescricao(linha.descricao());
         transacao.setValor(linha.valor());
         transacao.setTipo(linha.tipo());
-        transacao.setDataTransacao(linha.data());
         transacao.setConta(contaDaLinha(analise, linha));
         transacao.setCartao(cartaoDaLinha(analise, linha));
         transacao.setCategoria(categoriaDaLinha(analise, linha));
+        CalculadoraFatura.aplicarData(transacao, linha.data());
         return transacao;
     }
 

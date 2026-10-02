@@ -1,5 +1,6 @@
 package com.efinanceiro.servico;
 
+import com.efinanceiro.dominio.AlcanceEdicao;
 import com.efinanceiro.dominio.Cartao;
 import com.efinanceiro.dominio.Categoria;
 import com.efinanceiro.dominio.Conta;
@@ -68,7 +69,8 @@ public class ServicoRecorrencia {
 
     /**
      * Cria uma nova recorrência para o usuário autenticado e já gera todas as transações
-     * (uma por mês, a partir da data de início), cada uma com o seu número de parcela gravado.
+     * (uma por mês, a partir da data de início), cada uma com o seu número de parcela gravado. Com
+     * cartão, a data de início é a da compra e cada parcela cai no vencimento de uma fatura.
      *
      * @param emailUsuario E-mail do usuário autenticado
      * @param requisicao Dados da recorrência
@@ -104,7 +106,8 @@ public class ServicoRecorrencia {
      * @param valor Valor de cada parcela
      * @param tipo Entrada ou saída
      * @param totalParcelas Quantidade de parcelas
-     * @param dataInicio Data da primeira parcela
+     * @param dataInicio Data da primeira parcela; com cartão, a data da compra (cada parcela cai no
+     *                   vencimento de uma fatura, a partir da fatura da compra)
      * @return Recorrência criada
      */
     public Recorrencia gerarRecorrencia(Usuario usuario, Conta conta, Cartao cartao, Categoria categoria, String descricao,
@@ -121,25 +124,92 @@ public class ServicoRecorrencia {
         recorrencia.setDataInicio(dataInicio);
         repositorioRecorrencia.save(recorrencia);
 
+        gerarParcelas(recorrencia, 1);
+        return recorrencia;
+    }
+
+    /**
+     * Edita qualquer dado de uma recorrência. Com alcance FUTURAS (padrão), as parcelas até hoje
+     * ficam como estão e as seguintes são refeitas com os dados novos, continuando a numeração;
+     * com TODAS, todas as parcelas são refeitas. O total de parcelas não pode ficar menor que as
+     * parcelas mantidas.
+     *
+     * @param emailUsuario E-mail do usuário autenticado
+     * @param id Id da recorrência
+     * @param requisicao Novos dados e o alcance da edição
+     * @return Recorrência atualizada
+     */
+    public RespostaRecorrencia atualizarRecorrencia(String emailUsuario, Long id, RequisicaoRecorrencia requisicao) {
+        Usuario usuario = buscadorRecursosDoUsuario.buscarUsuario(emailUsuario);
+        Recorrencia recorrencia = repositorioRecorrencia.findByIdAndUsuarioId(id, usuario.getId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Recorrência não encontrada"));
+
+        Categoria categoria = buscadorRecursosDoUsuario.buscarCategoria(requisicao.categoriaId(), usuario.getId());
+
+        if (categoria.getTipo() != requisicao.tipo()) {
+            throw new DadosInvalidosException("A categoria não é do mesmo tipo da movimentação");
+        }
+
+        LocalDate hoje = LocalDate.now(relogio);
+        List<Transacao> parcelas = repositorioTransacao.findByRecorrenciaId(recorrencia.getId());
+        List<Transacao> refeitas = requisicao.alcance() == AlcanceEdicao.TODAS ? parcelas
+                : parcelas.stream().filter(parcela -> parcela.getDataTransacao().isAfter(hoje)).toList();
+
+        int ultimaMantida = parcelas.stream()
+                .filter(parcela -> !refeitas.contains(parcela))
+                .mapToInt(parcela -> parcela.getNumeroParcela() != null ? parcela.getNumeroParcela() : 0)
+                .max().orElse(0);
+
+        if (requisicao.totalParcelas() < ultimaMantida) {
+            throw new DadosInvalidosException("Já passaram " + ultimaMantida + " parcelas; o total não pode ser menor que isso");
+        }
+
+        repositorioTransacao.deleteAll(refeitas);
+
+        recorrencia.setDescricao(requisicao.descricao());
+        recorrencia.setValor(requisicao.valor());
+        recorrencia.setTipo(requisicao.tipo());
+        recorrencia.setCategoria(categoria);
+        recorrencia.setConta(buscadorRecursosDoUsuario.buscarConta(requisicao.contaId(), usuario.getId()));
+        recorrencia.setCartao(buscadorRecursosDoUsuario.buscarCartaoOpcional(requisicao.cartaoId(), usuario.getId()));
+        recorrencia.setTotalParcelas(requisicao.totalParcelas());
+
+        if (requisicao.dataInicio() != null) {
+            recorrencia.setDataInicio(requisicao.dataInicio());
+        }
+
+        repositorioRecorrencia.save(recorrencia);
+        gerarParcelas(recorrencia, ultimaMantida + 1);
+
+        return paraResposta(recorrencia, contarParcelasRestantes(recorrencia));
+    }
+
+    // Gera as parcelas da recorrência a partir do número informado até o total
+    private void gerarParcelas(Recorrencia recorrencia, int primeiraParcela) {
         List<Transacao> parcelas = new ArrayList<>();
 
-        for (int i = 0; i < totalParcelas; i++) {
+        for (int numero = primeiraParcela; numero <= recorrencia.getTotalParcelas(); numero++) {
             Transacao transacao = new Transacao();
-            transacao.setUsuario(usuario);
-            transacao.setDescricao(descricao);
-            transacao.setValor(valor);
-            transacao.setTipo(tipo);
-            transacao.setCategoria(categoria);
-            transacao.setConta(conta);
-            transacao.setCartao(cartao);
+            transacao.setUsuario(recorrencia.getUsuario());
+            transacao.setDescricao(recorrencia.getDescricao());
+            transacao.setValor(recorrencia.getValor());
+            transacao.setTipo(recorrencia.getTipo());
+            transacao.setCategoria(recorrencia.getCategoria());
+            transacao.setConta(recorrencia.getConta());
+            transacao.setCartao(recorrencia.getCartao());
             transacao.setRecorrencia(recorrencia);
-            transacao.setNumeroParcela(i + 1);
-            transacao.setDataTransacao(dataInicio.plusMonths(i));
+            transacao.setNumeroParcela(numero);
+
+            if (recorrencia.getCartao() != null) {
+                CalculadoraFatura.aplicarData(transacao, recorrencia.getDataInicio());
+            } else {
+                transacao.setDataTransacao(recorrencia.getDataInicio().plusMonths(numero - 1L));
+            }
+
             parcelas.add(transacao);
         }
 
         repositorioTransacao.saveAll(parcelas);
-        return recorrencia;
     }
 
     /**
@@ -153,33 +223,6 @@ public class ServicoRecorrencia {
 
         repositorioTransacao.deleteByRecorrenciaId(recorrencia.getId());
         repositorioRecorrencia.delete(recorrencia);
-    }
-
-    /**
-     * Atualiza o valor das parcelas futuras de uma recorrência (depois de hoje) e o valor
-     * de referência da recorrência. As parcelas passadas e a de hoje não mudam — a de hoje
-     * já conta no saldo como ocorrida.
-     *
-     * @param emailUsuario E-mail do usuário autenticado
-     * @param id Id da recorrência
-     * @param novoValor Novo valor a aplicar nas parcelas futuras
-     * @return Recorrência atualizada
-     */
-    public RespostaRecorrencia atualizarValorFuturo(String emailUsuario, Long id, BigDecimal novoValor) {
-        Recorrencia recorrencia = buscarRecorrenciaDoUsuario(emailUsuario, id);
-
-        List<Transacao> futuras = repositorioTransacao
-                .findByRecorrenciaIdAndDataTransacaoGreaterThan(recorrencia.getId(), LocalDate.now(relogio));
-
-        if (!futuras.isEmpty()) {
-            futuras.forEach(transacao -> transacao.setValor(novoValor));
-            repositorioTransacao.saveAll(futuras);
-
-            recorrencia.setValor(novoValor);
-            repositorioRecorrencia.save(recorrencia);
-        }
-
-        return paraResposta(recorrencia, futuras.size());
     }
 
     private Recorrencia buscarRecorrenciaDoUsuario(String emailUsuario, Long id) {

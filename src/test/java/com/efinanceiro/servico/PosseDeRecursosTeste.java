@@ -27,7 +27,7 @@ class PosseDeRecursosTeste extends TesteIntegracao {
 
         String cartao = mockMvc.perform(comToken(post("/api/cartoes"), tokenDona)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\": \"Cartão\", \"corFundo\": \"#111111\", \"corTexto\": \"#FFFFFF\"}"))
+                        .content("{\"nome\": \"Cartão\", \"corFundo\": \"#111111\", \"corTexto\": \"#FFFFFF\", \"diaFechamento\": 3, \"diaVencimento\": 10}"))
                 .andReturn().getResponse().getContentAsString();
         Long cartaoDona = ((Number) JsonPath.read(cartao, "$.id")).longValue();
 
@@ -59,9 +59,11 @@ class PosseDeRecursosTeste extends TesteIntegracao {
                 .andExpect(status().isNotFound());
         mockMvc.perform(comToken(delete("/api/recorrencias/" + recorrenciaDona), tokenIntruso))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(comToken(put("/api/recorrencias/" + recorrenciaDona + "/valor"), tokenIntruso)
+        mockMvc.perform(comToken(put("/api/recorrencias/" + recorrenciaDona), tokenIntruso)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"valor\": 1}"))
+                        .content("""
+                                {"descricao": "X", "valor": 1, "tipo": "SAIDA", "categoriaId": 5, "contaId": %d, "totalParcelas": 1}
+                                """.formatted(idContaPadrao(tokenIntruso))))
                 .andExpect(status().isNotFound());
         mockMvc.perform(comToken(get("/api/transacoes/resumo").param("contaId", contaDona.toString()), tokenIntruso))
                 .andExpect(jsonPath("$.saldo").value(0));

@@ -31,6 +31,10 @@ class PlanilhaTeste extends TesteIntegracao {
         return requisicao;
     }
 
+    private MockMultipartFile ciclosCartoesNovos(String json) {
+        return new MockMultipartFile("cartoesNovos", "", "application/json", json.getBytes(StandardCharsets.UTF_8));
+    }
+
     private String previa(String token, String csv) throws Exception {
         return mockMvc.perform(comToken(enviar("/api/planilhas/previa", csv, idContaPadrao(token)), token))
                 .andExpect(status().isOk())
@@ -113,7 +117,8 @@ class PlanilhaTeste extends TesteIntegracao {
 
         mockMvc.perform(comToken(enviar("/api/planilhas/importar", CABECALHO
                         + "01/03/2026;Ração;Saída;150,00;Pet;Empresa;Nubank;;\n"
-                        + "05/03/2026;Freela;Entrada;1.200,00;Freelance;;;;\n", idContaPadrao(token)), token))
+                        + "05/03/2026;Freela;Entrada;1.200,00;Freelance;;;;\n", idContaPadrao(token))
+                        .file(ciclosCartoesNovos("[{\"nome\": \"nubank\", \"diaFechamento\": 3, \"diaVencimento\": 10}]")), token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lancamentosAvulsos").value(2))
                 .andExpect(jsonPath("$.categoriasCriadas").value(2))
@@ -124,12 +129,55 @@ class PlanilhaTeste extends TesteIntegracao {
         assertThat((List<String>) JsonPath.read(lista, "$[?(@.descricao == 'Ração')].nomeCategoria")).containsExactly("Pet");
         assertThat((List<String>) JsonPath.read(lista, "$[?(@.descricao == 'Ração')].nomeConta")).containsExactly("Empresa");
         assertThat((List<String>) JsonPath.read(lista, "$[?(@.descricao == 'Ração')].nomeCartao")).containsExactly("Nubank");
+        assertThat((List<String>) JsonPath.read(lista, "$[?(@.descricao == 'Ração')].dataCompra")).containsExactly("2026-03-01");
+        assertThat((List<String>) JsonPath.read(lista, "$[?(@.descricao == 'Ração')].dataTransacao")).containsExactly("2026-03-10");
         assertThat((List<Double>) JsonPath.read(lista, "$[?(@.descricao == 'Freela')].valor")).containsExactly(1200.0);
         assertThat((List<String>) JsonPath.read(lista, "$[?(@.descricao == 'Freela')].nomeConta")).containsExactly("Pessoal");
 
         String categorias = mockMvc.perform(comToken(get("/api/categorias"), token)).andReturn().getResponse().getContentAsString();
         assertThat((List<String>) JsonPath.read(categorias, "$[?(@.nome == 'Pet')].tipo")).containsExactly("SAIDA");
         assertThat((List<String>) JsonPath.read(categorias, "$[?(@.nome == 'Freelance')].tipo")).containsExactly("ENTRADA");
+    }
+
+    @Test
+    void cartaoNovoSemFechamentoEVencimentoDevolve400ENaoGravaNada() throws Exception {
+        String token = cadastrarUsuario();
+
+        mockMvc.perform(comToken(enviar("/api/planilhas/importar", CABECALHO
+                        + "01/03/2026;Ração;Saída;150,00;Pet;;Nubank;;\n"
+                        + "02/03/2026;Mercado;Saída;80,00;;;Inter;;\n", idContaPadrao(token))
+                        .file(ciclosCartoesNovos("[{\"nome\": \"Inter\", \"diaFechamento\": 32, \"diaVencimento\": 5}]")), token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erros.length()").value(2))
+                .andExpect(jsonPath("$.erros[0].coluna").value("cartão"))
+                .andExpect(jsonPath("$.erros[0].mensagem").value("Informe o fechamento e o vencimento (dia de 1 a 31) do cartão novo 'Nubank'"))
+                .andExpect(jsonPath("$.erros[1].mensagem").value("Informe o fechamento e o vencimento (dia de 1 a 31) do cartão novo 'Inter'"));
+
+        assertThat(totalDeTransacoes(token)).isZero();
+        mockMvc.perform(comToken(get("/api/categorias"), token)).andExpect(jsonPath("$.length()").value(5));
+        mockMvc.perform(comToken(get("/api/cartoes"), token)).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void parcelasNoCartaoTrazemADataDaCompraECaemNasFaturas() throws Exception {
+        String token = cadastrarUsuario();
+        Long contaId = idContaPadrao(token);
+        String csv = CABECALHO
+                + "10/03/2026;TV;Saída;100,00;;;Nubank;1;3\n"
+                + "10/03/2026;TV;Saída;100,00;;;Nubank;2;3\n";
+
+        mockMvc.perform(comToken(enviar("/api/planilhas/importar", csv, contaId)
+                        .file(ciclosCartoesNovos("[{\"nome\": \"Nubank\", \"diaFechamento\": 3, \"diaVencimento\": 10}]")), token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recorrencias").value(1))
+                .andExpect(jsonPath("$.parcelasGeradas").value(3));
+
+        String lista = mockMvc.perform(comToken(get("/api/transacoes"), token)).andReturn().getResponse().getContentAsString();
+        assertThat((List<String>) JsonPath.read(lista, "$[*].dataTransacao")).containsExactly("2026-06-10", "2026-05-10", "2026-04-10");
+        assertThat((List<String>) JsonPath.read(lista, "$[*].dataCompra")).containsOnly("2026-03-10");
+
+        String resposta = previa(token, csv);
+        assertThat((List<Boolean>) JsonPath.read(resposta, "$.linhas[*].possivelDuplicado")).containsOnly(true);
     }
 
     @Test
@@ -263,7 +311,8 @@ class PlanilhaTeste extends TesteIntegracao {
                         + "01/03/2026;=HYPERLINK(\"x\");Saída;10,00;Pet;;;;\n"
                         + "02/03/2026;\"Almoço; sobremesa\";Saída;25,50;Alimentação;;;;\n"
                         + "05/03/2026;Salário;Entrada;3.000,00;;;;;\n"
-                        + "10/03/2026;Geladeira;Saída;300,00;Moradia;;Nubank;2;4\n", contaOrigem), tokenOrigem))
+                        + "10/03/2026;Geladeira;Saída;300,00;Moradia;;Nubank;2;4\n", contaOrigem)
+                        .file(ciclosCartoesNovos("[{\"nome\": \"Nubank\", \"diaFechamento\": 3, \"diaVencimento\": 10}]")), tokenOrigem))
                 .andExpect(status().isOk());
 
         byte[] exportado = mockMvc.perform(comToken(get("/api/planilhas/exportar"), tokenOrigem))
@@ -282,6 +331,7 @@ class PlanilhaTeste extends TesteIntegracao {
 
         mockMvc.perform(comToken(multipart(HttpMethod.POST, "/api/planilhas/importar")
                         .file(new MockMultipartFile("arquivo", "exportado.csv", "text/csv", exportado))
+                        .file(ciclosCartoesNovos("[{\"nome\": \"Nubank\", \"diaFechamento\": 3, \"diaVencimento\": 10}]"))
                         .param("contaPadraoId", idContaPadrao(tokenDestino).toString()), tokenDestino))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lancamentosAvulsos").value(3))

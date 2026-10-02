@@ -11,6 +11,7 @@ import com.efinanceiro.excecao.ServicoExternoIndisponivelException;
 import com.efinanceiro.repositorio.RepositorioCartao;
 import com.efinanceiro.repositorio.RepositorioCategoria;
 import com.efinanceiro.repositorio.RepositorioConta;
+import com.efinanceiro.repositorio.RepositorioAssinatura;
 import com.efinanceiro.repositorio.RepositorioRecorrencia;
 import com.efinanceiro.repositorio.RepositorioTransacao;
 import com.efinanceiro.repositorio.RepositorioUsuario;
@@ -38,6 +39,7 @@ public class ServicoPerfil {
     private final RepositorioUsuario repositorioUsuario;
     private final RepositorioTransacao repositorioTransacao;
     private final RepositorioRecorrencia repositorioRecorrencia;
+    private final RepositorioAssinatura repositorioAssinatura;
     private final RepositorioCartao repositorioCartao;
     private final RepositorioConta repositorioConta;
     private final RepositorioCategoria repositorioCategoria;
@@ -51,6 +53,7 @@ public class ServicoPerfil {
     public ServicoPerfil(RepositorioUsuario repositorioUsuario,
                           RepositorioTransacao repositorioTransacao,
                           RepositorioRecorrencia repositorioRecorrencia,
+                          RepositorioAssinatura repositorioAssinatura,
                           RepositorioCartao repositorioCartao,
                           RepositorioConta repositorioConta,
                           RepositorioCategoria repositorioCategoria,
@@ -63,6 +66,7 @@ public class ServicoPerfil {
         this.repositorioUsuario = repositorioUsuario;
         this.repositorioTransacao = repositorioTransacao;
         this.repositorioRecorrencia = repositorioRecorrencia;
+        this.repositorioAssinatura = repositorioAssinatura;
         this.repositorioCartao = repositorioCartao;
         this.repositorioConta = repositorioConta;
         this.repositorioCategoria = repositorioCategoria;
@@ -203,6 +207,7 @@ public class ServicoPerfil {
         // Ordem importa por causa das FKs: quem aponta pra alguém é apagado antes
         repositorioTransacao.deleteByUsuarioId(usuarioId);
         repositorioRecorrencia.deleteByUsuarioId(usuarioId);
+        repositorioAssinatura.deleteByUsuarioId(usuarioId);
         repositorioCategoria.deleteByUsuarioId(usuarioId);
         repositorioCartao.deleteByUsuarioId(usuarioId);
         repositorioConta.deleteByUsuarioId(usuarioId);

@@ -1,6 +1,5 @@
 package com.efinanceiro.controlador;
 
-import com.efinanceiro.dto.requisicao.RequisicaoAtualizacaoValorRecorrencia;
 import com.efinanceiro.dto.requisicao.RequisicaoRecorrencia;
 import com.efinanceiro.dto.resposta.RespostaRecorrencia;
 import com.efinanceiro.servico.ServicoRecorrencia;
@@ -68,17 +67,18 @@ public class ControladorRecorrencia {
     }
 
     /**
-     * Atualiza o valor das parcelas futuras de uma recorrência do usuário autenticado.
+     * Edita qualquer dado de uma recorrência do usuário autenticado, refazendo só as parcelas
+     * futuras ou todas.
      *
      * @param autenticacao Autenticação do usuário atual
      * @param id Id da recorrência
-     * @param requisicao Novo valor a aplicar nas parcelas futuras
+     * @param requisicao Novos dados e o alcance da edição
      * @return Recorrência atualizada
      */
-    @PutMapping("/{id}/valor")
-    public ResponseEntity<RespostaRecorrencia> atualizarValorFuturo(Authentication autenticacao,
-                                                                      @PathVariable Long id,
-                                                                      @Valid @RequestBody RequisicaoAtualizacaoValorRecorrencia requisicao) {
-        return ResponseEntity.ok(servicoRecorrencia.atualizarValorFuturo(autenticacao.getName(), id, requisicao.valor()));
+    @PutMapping("/{id}")
+    public ResponseEntity<RespostaRecorrencia> atualizarRecorrencia(Authentication autenticacao,
+                                                                    @PathVariable Long id,
+                                                                    @Valid @RequestBody RequisicaoRecorrencia requisicao) {
+        return ResponseEntity.ok(servicoRecorrencia.atualizarRecorrencia(autenticacao.getName(), id, requisicao));
     }
 }

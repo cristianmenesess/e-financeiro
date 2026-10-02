@@ -40,6 +40,7 @@ public class ServicoAutenticacao {
     private final ServicoEmail servicoEmail;
     private final RepositorioConta repositorioConta;
     private final ServicoLimiteRequisicoes servicoLimiteRequisicoes;
+    private final ServicoAssinatura servicoAssinatura;
     private final Clock relogio;
     private final String frontendUrl;
 
@@ -49,6 +50,7 @@ public class ServicoAutenticacao {
                                 ServicoEmail servicoEmail,
                                 RepositorioConta repositorioConta,
                                 ServicoLimiteRequisicoes servicoLimiteRequisicoes,
+                                ServicoAssinatura servicoAssinatura,
                                 Clock relogio,
                                 @Value("${app.frontend.url}") String frontendUrl) {
         this.repositorioUsuario = repositorioUsuario;
@@ -57,6 +59,7 @@ public class ServicoAutenticacao {
         this.servicoEmail = servicoEmail;
         this.repositorioConta = repositorioConta;
         this.servicoLimiteRequisicoes = servicoLimiteRequisicoes;
+        this.servicoAssinatura = servicoAssinatura;
         this.relogio = relogio;
         this.frontendUrl = frontendUrl;
     }
@@ -114,6 +117,8 @@ public class ServicoAutenticacao {
         if (!codificadorDeSenha.matches(requisicao.senha(), usuario.getSenhaHash())) {
             throw new CredenciaisInvalidasException("E-mail ou senha inválidos");
         }
+
+        lancarProximasCobrancas(usuario);
 
         String token = servicoJwt.gerarToken(usuario.getEmail());
         return new RespostaAutenticacao(token, usuario.getNome(), usuario.getEmail(), usuario.getFotoUrl());
@@ -177,6 +182,15 @@ public class ServicoAutenticacao {
         usuario.setTokenRedefinicaoHash(null);
         usuario.setTokenRedefinicaoExpiraEm(null);
         repositorioUsuario.save(usuario);
+    }
+
+    // Falha aqui não impede o login: a tarefa agendada lança as cobranças depois
+    private void lancarProximasCobrancas(Usuario usuario) {
+        try {
+            servicoAssinatura.lancarProximasCobrancas(usuario);
+        } catch (RuntimeException e) {
+            log.warn("Não foi possível lançar as próximas cobranças das assinaturas do usuário {}", usuario.getId(), e);
+        }
     }
 
     private void criarContaPadrao(Usuario usuario) {

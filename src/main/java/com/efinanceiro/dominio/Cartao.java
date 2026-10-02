@@ -40,6 +40,12 @@ public class Cartao {
     @Column(name = "cor_texto", nullable = false, length = 7)
     private String corTexto;
 
+    @Column(name = "dia_fechamento", nullable = false)
+    private Integer diaFechamento;
+
+    @Column(name = "dia_vencimento", nullable = false)
+    private Integer diaVencimento;
+
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;
 

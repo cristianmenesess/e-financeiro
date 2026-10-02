@@ -17,8 +17,10 @@ public record RespostaTransacao(
         Long cartaoId,
         String nomeCartao,
         LocalDate dataTransacao,
+        LocalDate dataCompra,
         Long recorrenciaId,
         Integer numeroParcela,
-        Integer totalParcelas
+        Integer totalParcelas,
+        Long assinaturaId
 ) {
 }

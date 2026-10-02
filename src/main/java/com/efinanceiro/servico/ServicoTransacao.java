@@ -94,7 +94,8 @@ public class ServicoTransacao {
     }
 
     /**
-     * Cria uma nova transação para o usuário autenticado.
+     * Cria uma nova transação para o usuário autenticado. Com cartão, a data informada é a da
+     * compra e a transação cai no vencimento da fatura correspondente.
      *
      * @param emailUsuario E-mail do usuário autenticado
      * @param requisicao Dados da transação
@@ -113,7 +114,8 @@ public class ServicoTransacao {
 
     /**
      * Atualiza uma transação existente do usuário autenticado. Se ela for parcela de uma
-     * recorrência, continua vinculada e mantém o número da parcela, mesmo que a data mude.
+     * recorrência, continua vinculada e mantém o número da parcela, mesmo que a data mude. Com
+     * cartão, a data informada é a da compra e a parcela cai no vencimento da fatura dela.
      *
      * @param emailUsuario E-mail do usuário autenticado
      * @param id Id da transação a atualizar
@@ -156,8 +158,8 @@ public class ServicoTransacao {
         transacao.setTipo(requisicao.tipo());
         transacao.setConta(buscadorRecursosDoUsuario.buscarConta(requisicao.contaId(), usuario.getId()));
         transacao.setCategoria(resolverCategoria(requisicao.categoriaId(), requisicao.tipo(), usuario));
-        transacao.setDataTransacao(requisicao.dataTransacao() != null ? requisicao.dataTransacao() : LocalDate.now(relogio));
         transacao.setCartao(buscadorRecursosDoUsuario.buscarCartaoOpcional(requisicao.cartaoId(), usuario.getId()));
+        CalculadoraFatura.aplicarData(transacao, requisicao.dataTransacao() != null ? requisicao.dataTransacao() : LocalDate.now(relogio));
     }
 
     private Categoria resolverCategoria(Long categoriaId, TipoTransacao tipo, Usuario usuario) {
@@ -200,9 +202,11 @@ public class ServicoTransacao {
                 cartao != null ? cartao.getId() : null,
                 cartao != null ? cartao.getNome() : null,
                 transacao.getDataTransacao(),
+                transacao.getDataCompra(),
                 recorrencia != null ? recorrencia.getId() : null,
                 recorrencia != null ? transacao.getNumeroParcela() : null,
-                recorrencia != null ? recorrencia.getTotalParcelas() : null
+                recorrencia != null ? recorrencia.getTotalParcelas() : null,
+                transacao.getAssinatura() != null ? transacao.getAssinatura().getId() : null
         );
     }
 }

@@ -343,7 +343,7 @@ class PerfilTeste extends TesteIntegracao {
 
         String cartao = mockMvc.perform(comToken(post("/api/cartoes"), token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\": \"Cartão\", \"corFundo\": \"#111111\", \"corTexto\": \"#FFFFFF\"}"))
+                        .content("{\"nome\": \"Cartão\", \"corFundo\": \"#111111\", \"corTexto\": \"#FFFFFF\", \"diaFechamento\": 3, \"diaVencimento\": 10}"))
                 .andReturn().getResponse().getContentAsString();
         Long cartaoId = ((Number) JsonPath.read(cartao, "$.id")).longValue();
         criarTransacao(token, contaId, "SAIDA", "50.00", "2026-03-01", cartaoId);
@@ -352,6 +352,13 @@ class PerfilTeste extends TesteIntegracao {
                         .content("""
                                 {"descricao": "Aluguel", "valor": 100, "tipo": "SAIDA", "categoriaId": 4,
                                  "contaId": %d, "cartaoId": %d, "totalParcelas": 3}
+                                """.formatted(contaId, cartaoId)))
+                .andExpect(status().isCreated());
+        mockMvc.perform(comToken(post("/api/assinaturas"), token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"descricao": "Streaming", "valor": 30, "periodicidade": "MENSAL", "categoriaId": 5,
+                                 "contaId": %d, "cartaoId": %d, "dataInicio": "2026-01-10"}
                                 """.formatted(contaId, cartaoId)))
                 .andExpect(status().isCreated());
         when(servicoFotoPerfil.enviar(anyLong(), any())).thenReturn(URL_FOTO);
@@ -364,7 +371,7 @@ class PerfilTeste extends TesteIntegracao {
                         .content("{\"senha\": \"%s\"}".formatted(SENHA_PADRAO)))
                 .andExpect(status().isNoContent());
 
-        for (String tabela : new String[]{"transacoes", "recorrencias", "categorias", "cartoes", "contas"}) {
+        for (String tabela : new String[]{"transacoes", "recorrencias", "assinaturas", "categorias", "cartoes", "contas"}) {
             Integer restantes = jdbcTemplate.queryForObject(
                     "select count(*) from " + tabela + " where usuario_id = ?", Integer.class, usuarioId);
             assertThat(restantes).as(tabela).isZero();

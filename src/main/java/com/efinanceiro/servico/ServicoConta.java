@@ -7,6 +7,7 @@ import com.efinanceiro.dto.resposta.RespostaConta;
 import com.efinanceiro.excecao.CredenciaisInvalidasException;
 import com.efinanceiro.excecao.RegraDeNegocioException;
 import com.efinanceiro.repositorio.RepositorioConta;
+import com.efinanceiro.repositorio.RepositorioAssinatura;
 import com.efinanceiro.repositorio.RepositorioRecorrencia;
 import com.efinanceiro.repositorio.RepositorioTransacao;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,17 +23,20 @@ public class ServicoConta {
     private final RepositorioConta repositorioConta;
     private final RepositorioTransacao repositorioTransacao;
     private final RepositorioRecorrencia repositorioRecorrencia;
+    private final RepositorioAssinatura repositorioAssinatura;
     private final BuscadorRecursosDoUsuario buscadorRecursosDoUsuario;
     private final PasswordEncoder codificadorDeSenha;
 
     public ServicoConta(RepositorioConta repositorioConta,
                          RepositorioTransacao repositorioTransacao,
                          RepositorioRecorrencia repositorioRecorrencia,
+                         RepositorioAssinatura repositorioAssinatura,
                          BuscadorRecursosDoUsuario buscadorRecursosDoUsuario,
                          PasswordEncoder codificadorDeSenha) {
         this.repositorioConta = repositorioConta;
         this.repositorioTransacao = repositorioTransacao;
         this.repositorioRecorrencia = repositorioRecorrencia;
+        this.repositorioAssinatura = repositorioAssinatura;
         this.buscadorRecursosDoUsuario = buscadorRecursosDoUsuario;
         this.codificadorDeSenha = codificadorDeSenha;
     }
@@ -116,6 +120,7 @@ public class ServicoConta {
 
         repositorioTransacao.deleteByContaId(conta.getId());
         repositorioRecorrencia.deleteByContaId(conta.getId());
+        repositorioAssinatura.deleteByContaId(conta.getId());
         repositorioConta.delete(conta);
     }
 

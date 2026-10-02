@@ -55,7 +55,7 @@ class FusoHorarioTeste extends TesteIntegracao {
     }
 
     @Test
-    void gastoDoCartaoNaoViraOMesAntesDaHora() throws Exception {
+    void faturaDoCartaoNaoViraAntesDaHora() throws Exception {
         relogio.definir(Instant.parse("2026-04-01T01:30:00Z")); // 31/03 às 22h30 em Brasília
 
         String token = cadastrarUsuario();
@@ -63,7 +63,7 @@ class FusoHorarioTeste extends TesteIntegracao {
 
         String cartao = mockMvc.perform(comToken(post("/api/cartoes"), token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nome\": \"Nubank\", \"corFundo\": \"#820AD1\", \"corTexto\": \"#FFFFFF\"}"))
+                        .content("{\"nome\": \"Nubank\", \"corFundo\": \"#820AD1\", \"corTexto\": \"#FFFFFF\", \"diaFechamento\": 1, \"diaVencimento\": 10}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         Long cartaoId = ((Number) JsonPath.read(cartao, "$.id")).longValue();
@@ -71,7 +71,8 @@ class FusoHorarioTeste extends TesteIntegracao {
         criarTransacao(token, contaId, "SAIDA", "120.00", "2026-03-31", cartaoId);
 
         mockMvc.perform(comToken(get("/api/cartoes"), token))
-                .andExpect(jsonPath("$[0].gastoNoMes").value(120.00));
+                .andExpect(jsonPath("$[0].faturaAtual").value(120.00))
+                .andExpect(jsonPath("$[0].vencimentoFaturaAtual").value("2026-04-10"));
     }
 
     @Test

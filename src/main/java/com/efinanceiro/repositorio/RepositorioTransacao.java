@@ -14,7 +14,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -34,15 +33,31 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
     Page<Transacao> findByUsuarioId(Long usuarioId, Pageable paginacao);
 
     /**
-     * Lista as transações de um usuário num intervalo de datas — usado pra detectar possíveis
-     * duplicados numa importação.
+     * Lista as transações de um usuário num intervalo de datas, usando a data da compra quando há
+     * cartão — usado pra detectar possíveis duplicados numa importação.
      *
      * @param usuarioId Id do usuário
      * @param inicio Data inicial (inclusive)
      * @param fim Data final (inclusive)
      * @return Transações do período
      */
-    List<Transacao> findByUsuarioIdAndDataTransacaoBetween(Long usuarioId, LocalDate inicio, LocalDate fim);
+    @Query("""
+            select t from Transacao t
+            where t.usuario.id = :usuarioId and coalesce(t.dataCompra, t.dataTransacao) between :inicio and :fim
+            """)
+    List<Transacao> buscarPorDataInformada(@Param("usuarioId") Long usuarioId,
+                                           @Param("inicio") LocalDate inicio,
+                                           @Param("fim") LocalDate fim);
+
+    /**
+     * Lista as transações de um cartão depois de uma data — usado pra recalcular as faturas
+     * futuras quando o fechamento ou o vencimento do cartão muda.
+     *
+     * @param cartaoId Id do cartão
+     * @param data Data limite (exclusive)
+     * @return Transações do cartão depois da data
+     */
+    List<Transacao> findByCartaoIdAndDataTransacaoGreaterThan(Long cartaoId, LocalDate data);
 
     /**
      * Lista as transações de um usuário filtradas por conta — mesma finalidade da variante acima.
@@ -100,45 +115,26 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
     Optional<Transacao> findByIdAndUsuarioId(Long id, Long usuarioId);
 
     /**
-     * Soma, numa consulta só, o gasto de cada cartão de um usuário num intervalo de datas — usado
-     * pra listar os cartões com o gasto do mês sem uma consulta por cartão.
+     * Soma, numa consulta só, o gasto de cada cartão de um usuário por dia num intervalo de datas —
+     * cada cartão tem o próprio ciclo de fatura, então a separação por fatura é feita depois.
      *
      * @param usuarioId Id do usuário dono dos cartões
      * @param tipo Tipo da transação (sempre SAIDA nesse uso)
      * @param inicio Data inicial do intervalo (inclusive)
      * @param fim Data final do intervalo (inclusive)
-     * @return Um total por cartão que tiver gastos no período (cartão sem gasto não aparece)
+     * @return Um total por cartão e dia que tiver gastos no período
      */
     @Query("""
-            select new com.efinanceiro.repositorio.projecao.GastoPorCartao(t.cartao.id, sum(t.valor))
+            select new com.efinanceiro.repositorio.projecao.GastoPorCartao(t.cartao.id, t.dataTransacao, sum(t.valor))
             from Transacao t
             where t.usuario.id = :usuarioId and t.cartao is not null and t.tipo = :tipo
               and t.dataTransacao between :inicio and :fim
-            group by t.cartao.id
+            group by t.cartao.id, t.dataTransacao
             """)
-    List<GastoPorCartao> somarPorCartao(@Param("usuarioId") Long usuarioId,
-                                        @Param("tipo") TipoTransacao tipo,
-                                        @Param("inicio") LocalDate inicio,
-                                        @Param("fim") LocalDate fim);
-
-    /**
-     * Soma o gasto de um único cartão num intervalo de datas — usado ao criar/editar um cartão.
-     *
-     * @param cartaoId Id do cartão
-     * @param tipo Tipo da transação (sempre SAIDA nesse uso)
-     * @param inicio Data inicial do intervalo (inclusive)
-     * @param fim Data final do intervalo (inclusive)
-     * @return Total gasto no período (zero se não houver transações)
-     */
-    @Query("""
-            select coalesce(sum(t.valor), 0)
-            from Transacao t
-            where t.cartao.id = :cartaoId and t.tipo = :tipo and t.dataTransacao between :inicio and :fim
-            """)
-    BigDecimal somarDoCartao(@Param("cartaoId") Long cartaoId,
-                             @Param("tipo") TipoTransacao tipo,
-                             @Param("inicio") LocalDate inicio,
-                             @Param("fim") LocalDate fim);
+    List<GastoPorCartao> somarPorCartaoEDia(@Param("usuarioId") Long usuarioId,
+                                            @Param("tipo") TipoTransacao tipo,
+                                            @Param("inicio") LocalDate inicio,
+                                            @Param("fim") LocalDate fim);
 
     /**
      * Apaga todas as transações vinculadas a uma conta, num único DELETE — usado ao excluir a conta
@@ -178,14 +174,33 @@ public interface RepositorioTransacao extends JpaRepository<Transacao, Long> {
                                                                      @Param("data") LocalDate data);
 
     /**
-     * Lista as transações futuras (depois da data informada) de uma recorrência — usado pra
-     * propagar edição de valor.
+     * Lista as parcelas de uma recorrência — usado ao editar a recorrência.
      *
      * @param recorrenciaId Id da recorrência
-     * @param data Data de referência (normalmente hoje) — lista transações com data > essa
-     * @return Lista de transações futuras da recorrência
+     * @return Parcelas da recorrência
      */
-    List<Transacao> findByRecorrenciaIdAndDataTransacaoGreaterThan(Long recorrenciaId, LocalDate data);
+    List<Transacao> findByRecorrenciaId(Long recorrenciaId);
+
+    /**
+     * Apaga todas as cobranças de uma assinatura, num único DELETE — usado ao excluir a assinatura
+     * ou ao refazer todas as cobranças.
+     *
+     * @param assinaturaId Id da assinatura
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Transacao t where t.assinatura.id = :assinaturaId")
+    void deleteByAssinaturaId(@Param("assinaturaId") Long assinaturaId);
+
+    /**
+     * Apaga as cobranças de uma assinatura feitas depois de uma data (no cartão, conta a data da
+     * compra, não o vencimento da fatura) — usado ao cancelar ou editar só as próximas cobranças.
+     *
+     * @param assinaturaId Id da assinatura
+     * @param data Data de referência (normalmente hoje) — apaga cobranças com data > essa
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Transacao t where t.assinatura.id = :assinaturaId and coalesce(t.dataCompra, t.dataTransacao) > :data")
+    void apagarCobrancasDepoisDe(@Param("assinaturaId") Long assinaturaId, @Param("data") LocalDate data);
 
     /**
      * Apaga todas as transações (passadas e futuras) de uma recorrência, num único DELETE — usado ao

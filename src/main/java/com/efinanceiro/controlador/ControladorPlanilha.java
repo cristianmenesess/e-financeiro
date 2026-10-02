@@ -1,5 +1,6 @@
 package com.efinanceiro.controlador;
 
+import com.efinanceiro.dto.requisicao.RequisicaoCartaoImportado;
 import com.efinanceiro.dto.resposta.RespostaImportacao;
 import com.efinanceiro.dto.resposta.RespostaPreviaImportacao;
 import com.efinanceiro.excecao.DadosInvalidosException;
@@ -74,15 +75,18 @@ public class ControladorPlanilha {
      * @param arquivo Arquivo CSV no campo multipart "arquivo"
      * @param contaPadraoId Conta usada nas linhas sem a coluna conta
      * @param linhasDuplicadasIncluidas Linhas marcadas como possível duplicado que devem ser importadas
+     * @param cartoesNovos Parte JSON com fechamento e vencimento dos cartões que a importação vai criar
      * @return Resumo da importação
      */
     @PostMapping("/importar")
     public ResponseEntity<RespostaImportacao> importar(Authentication autenticacao,
                                                        @RequestPart("arquivo") MultipartFile arquivo,
                                                        @RequestParam("contaPadraoId") Long contaPadraoId,
-                                                       @RequestParam(value = "linhasDuplicadasIncluidas", required = false) List<Integer> linhasDuplicadasIncluidas) {
+                                                       @RequestParam(value = "linhasDuplicadasIncluidas", required = false) List<Integer> linhasDuplicadasIncluidas,
+                                                       @RequestPart(value = "cartoesNovos", required = false) List<RequisicaoCartaoImportado> cartoesNovos) {
         return ResponseEntity.ok(servicoImportacaoPlanilha.importar(autenticacao.getName(), lerArquivo(arquivo), contaPadraoId,
-                linhasDuplicadasIncluidas == null ? new HashSet<>() : new HashSet<>(linhasDuplicadasIncluidas)));
+                linhasDuplicadasIncluidas == null ? new HashSet<>() : new HashSet<>(linhasDuplicadasIncluidas),
+                cartoesNovos == null ? List.of() : cartoesNovos));
     }
 
     /**

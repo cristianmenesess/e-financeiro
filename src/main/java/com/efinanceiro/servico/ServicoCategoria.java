@@ -14,6 +14,7 @@ import com.efinanceiro.excecao.RecursoDuplicadoException;
 import com.efinanceiro.excecao.RecursoNaoEncontradoException;
 import com.efinanceiro.excecao.RegraDeNegocioException;
 import com.efinanceiro.repositorio.RepositorioCategoria;
+import com.efinanceiro.repositorio.RepositorioAssinatura;
 import com.efinanceiro.repositorio.RepositorioRecorrencia;
 import com.efinanceiro.repositorio.RepositorioTransacao;
 import org.springframework.stereotype.Service;
@@ -38,15 +39,18 @@ public class ServicoCategoria {
     private final RepositorioCategoria repositorioCategoria;
     private final RepositorioTransacao repositorioTransacao;
     private final RepositorioRecorrencia repositorioRecorrencia;
+    private final RepositorioAssinatura repositorioAssinatura;
     private final BuscadorRecursosDoUsuario buscadorRecursosDoUsuario;
 
     public ServicoCategoria(RepositorioCategoria repositorioCategoria,
                              RepositorioTransacao repositorioTransacao,
                              RepositorioRecorrencia repositorioRecorrencia,
+                             RepositorioAssinatura repositorioAssinatura,
                              BuscadorRecursosDoUsuario buscadorRecursosDoUsuario) {
         this.repositorioCategoria = repositorioCategoria;
         this.repositorioTransacao = repositorioTransacao;
         this.repositorioRecorrencia = repositorioRecorrencia;
+        this.repositorioAssinatura = repositorioAssinatura;
         this.buscadorRecursosDoUsuario = buscadorRecursosDoUsuario;
     }
 
@@ -135,7 +139,7 @@ public class ServicoCategoria {
      *
      * @param emailUsuario E-mail do usuário autenticado
      * @param id Id da categoria
-     * @return Quantidade de transações + recorrências movidas
+     * @return Quantidade de transações, recorrências e assinaturas movidas
      */
     public RespostaExclusaoCategoria excluirCategoria(String emailUsuario, Long id) {
         Usuario usuario = buscadorRecursosDoUsuario.buscarUsuario(emailUsuario);
@@ -146,7 +150,8 @@ public class ServicoCategoria {
                 .orElseThrow(() -> new IllegalStateException("Categoria fixa " + codigoDestino + " não existe no banco"));
 
         long movidas = repositorioTransacao.moverCategoria(categoria, destino)
-                + repositorioRecorrencia.moverCategoria(categoria, destino);
+                + repositorioRecorrencia.moverCategoria(categoria, destino)
+                + repositorioAssinatura.moverCategoria(categoria, destino);
 
         repositorioCategoria.delete(categoria);
         return new RespostaExclusaoCategoria(movidas);

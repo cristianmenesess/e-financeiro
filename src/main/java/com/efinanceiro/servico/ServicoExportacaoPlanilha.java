@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -44,7 +45,7 @@ public class ServicoExportacaoPlanilha {
     public byte[] gerarModelo() {
         return (BOM + cabecalho()
                 + String.join(SEPARADOR, "05/09/2026", "Salário de setembro", "Entrada", "3500,00", "Renda", "", "", "", "") + FIM_DE_LINHA
-                + String.join(SEPARADOR, "10/09/2026", "Geladeira", "Saída", "300,00", "Moradia", "", "Nubank", "3", "10") + FIM_DE_LINHA)
+                + String.join(SEPARADOR, "10/07/2026", "Geladeira", "Saída", "300,00", "Moradia", "", "Nubank", "3", "10") + FIM_DE_LINHA)
                 .getBytes(StandardCharsets.UTF_8);
     }
 
@@ -71,8 +72,11 @@ public class ServicoExportacaoPlanilha {
     private String paraLinha(Transacao transacao) {
         boolean parcela = transacao.getRecorrencia() != null;
 
+        // Com cartão, sai a data da compra — a mesma que a importação espera
+        LocalDate data = transacao.getDataCompra() != null ? transacao.getDataCompra() : transacao.getDataTransacao();
+
         return String.join(SEPARADOR,
-                transacao.getDataTransacao().format(FORMATO_DATA),
+                data.format(FORMATO_DATA),
                 celula(transacao.getDescricao()),
                 transacao.getTipo() == TipoTransacao.ENTRADA ? "Entrada" : "Saída",
                 transacao.getValor().setScale(2, RoundingMode.HALF_UP).toPlainString().replace('.', ','),
