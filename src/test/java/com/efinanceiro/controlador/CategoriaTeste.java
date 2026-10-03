@@ -75,7 +75,8 @@ class CategoriaTeste extends TesteIntegracao {
         List<String> tons = JsonPath.read(resposta, "$.tons");
 
         assertThat(icones).contains("car", "dog", "banknote").hasSize(33);
-        assertThat(tons).containsExactly("brand", "positive", "negative", "warning", "ai", "neutral");
+        assertThat(tons).containsExactly("brand", "positive", "negative", "warning", "ai", "neutral",
+                "blue", "indigo", "purple", "magenta", "wine", "pink", "brown");
     }
 
     @Test

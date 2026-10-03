@@ -8,8 +8,10 @@ import java.util.List;
  */
 public final class OpcoesCategoria {
 
-    // Só os tons que têm classe ef-icon-tile--<tom> no design system (neutral = tile padrão)
-    public static final List<String> TONS = List.of("brand", "positive", "negative", "warning", "ai", "neutral");
+    // Só os tons que têm classe ef-icon-tile--<tom> no design system (neutral = tile padrão): os seis
+    // de status e, depois, a paleta de categorias
+    public static final List<String> TONS = List.of("brand", "positive", "negative", "warning", "ai", "neutral",
+            "blue", "indigo", "purple", "magenta", "wine", "pink", "brown");
 
     public static final List<String> ICONES = List.of(
             "banknote", "receipt", "shopping-bag", "house", "ellipsis",
